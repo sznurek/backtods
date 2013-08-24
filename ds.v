@@ -18,7 +18,7 @@ Inductive CrootValid : Croot -> Prop :=
 with CexpValid : Cexp -> list var -> Prop :=
 | CexpValid_cont : forall (ksi:list var) (t:Ctriv), CtrivValid t ksi nil -> CexpValid (Cexp_cont t) ksi
 | CexpValid_app  : forall (ksi0 ksi1 ksi2:list var) (v:var) (t0 t1:Ctriv) (e:Cexp),
-                     CtrivValid t0 ksi0 ksi1 -> CtrivValid t1 ksi1 ksi2 ->
+                     CtrivValid t1 ksi0 ksi1 -> CtrivValid t0 ksi1 ksi2 ->
                      CexpValid e (v::ksi2) ->
                      CexpValid (Cexp_app t0 t1 v e) ksi0
 with CtrivValid : Ctriv -> list var -> list var -> Prop :=
@@ -61,11 +61,56 @@ match e with
 | Dexp_app e0 e1 => cps_exp_transform e0 (fun t0 =>
                     cps_exp_transform e1 (fun t1 =>
                         Cexp_app t0 t1 0 (k (Ctriv_vvar 0))))
-| Dexp_triv t    => k (cps_triv_transformation t)
+| Dexp_triv t    => k (cps_triv_transform t)
 end
-with cps_triv_transformation (t:Dtriv) : Ctriv :=
+with cps_triv_transform (t:Dtriv) : Ctriv :=
 match t with
 | Dtriv_var x   => Ctriv_var x
 | Dtriv_lam x r => Ctriv_lam x (cps_transform r)
 end.
 
+Definition good_continuation (k:Ctriv -> Cexp) (s:list var) :=
+  forall (t:Ctriv) (s':list var), CtrivValid t s' s -> CexpValid (k t) s'.
+
+Theorem cps_transform_valid :
+  forall r:Droot, CrootValid (cps_transform r).
+Proof.
+apply (Droot_mut (fun r => CrootValid (cps_transform r))
+                 (fun e => forall (k:Ctriv -> Cexp) (s:list var),
+                             good_continuation k s ->
+                             CexpValid (cps_exp_transform e k) s)
+                 (fun t => forall (s:list var), CtrivValid (cps_triv_transform t) s s)).
+intros.
+constructor.
+apply H.
+
+intros.
+unfold good_continuation.
+intros.
+apply CexpValid_cont; auto.
+
+intros.
+simpl.
+apply H.
+unfold good_continuation.
+intros t0 s0.
+intros.
+apply H0.
+unfold good_continuation.
+intros t1 s1.
+intros.
+apply CexpValid_app with (ksi1 := s0) (ksi2 := s); auto.
+
+intros.
+simpl.
+unfold good_continuation in H0.
+apply H0; auto.
+
+intros.
+simpl.
+auto.
+
+intros.
+simpl.
+auto.
+Qed.
