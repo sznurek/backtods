@@ -72,6 +72,8 @@ end.
 Definition good_continuation (k:Ctriv -> Cexp) (s:list var) :=
   forall (t:Ctriv) (s':list var), CtrivValid t s' s -> CexpValid (k t) s'.
 
+Hint Unfold good_continuation.
+
 Theorem cps_transform_valid :
   forall r:Droot, CrootValid (cps_transform r).
 Proof.
@@ -79,38 +81,6 @@ apply (Droot_mut (fun r => CrootValid (cps_transform r))
                  (fun e => forall (k:Ctriv -> Cexp) (s:list var),
                              good_continuation k s ->
                              CexpValid (cps_exp_transform e k) s)
-                 (fun t => forall (s:list var), CtrivValid (cps_triv_transform t) s s)).
-intros.
-constructor.
-apply H.
-
-intros.
-unfold good_continuation.
-intros.
-apply CexpValid_cont; auto.
-
-intros.
-simpl.
-apply H.
-unfold good_continuation.
-intros t0 s0.
-intros.
-apply H0.
-unfold good_continuation.
-intros t1 s1.
-intros.
-apply CexpValid_app with (ksi1 := s0) (ksi2 := s); auto.
-
-intros.
-simpl.
-unfold good_continuation in H0.
-apply H0; auto.
-
-intros.
-simpl.
-auto.
-
-intros.
-simpl.
-auto.
+                 (fun t => forall (s:list var), CtrivValid (cps_triv_transform t) s s));
+intros; unfold good_continuation in *; eauto; simpl; intuition; eauto.
 Qed.
