@@ -190,50 +190,93 @@ admit.
 inversion H1.
 Qed.
 
-Fixpoint nonhole_trivial (e:DHexp) : bool :=
-match e with
-| DHexp_app _ _ => false
-| DHexp_triv t  => match t with
-                   | DHtriv_var _   => true
-                   | DHtriv_lam _ _ => true
-                   | DHtriv_vvar _  => false
-                   end
-end.
-
-Fixpoint plug_triv (t:DHtriv) (e:DHexp) : DHexp :=
+Fixpoint plug_triv_aux (t:DHtriv) (e:DHexp) : (DHexp * bool) :=
 match t with
-| DHtriv_var v   => DHtriv_var v
-| DHtriv_lam x r => DHtriv_lam x r
-| DHtriv_vvar _  => e
+| DHtriv_var v   => (DHexp_triv (DHtriv_var v), false)
+| DHtriv_lam x r => (DHexp_triv (DHtriv_lam x r), false)
+| DHtriv_vvar _  => (e, true)
 end.
 
-Fixpoint plug_exp (e:DHexp) (e':DHexp) : DHexp :=
+Fixpoint plug_exp_aux (e:DHexp) (e':DHexp) : (DHexp * bool) :=
 match e with
-| DHexp_triv t    => plug_triv t e
-| DHexp_app e0 e1 => if nonhole_trivial e0
-                       then DHexp_app e0 (plug_exp e1 e')
-                       else DHexp_app (plug_exp e0 e') e1
+| DHexp_triv t    => plug_triv_aux t e'
+| DHexp_app e0 e1 => let a0 := plug_exp_aux e0 e' in
+                     let a1 := plug_exp_aux e1 e' in
+                     if snd a0
+                       then (DHexp_app (fst a0) e1, true)
+                       else (DHexp_app e0 (fst a1), snd a1)
 end.
 
-Fixpoint plug (r:DHroot) (e:DHexp) : DHroot :=
-match r with
-| DHroot_exp e' => plug_exp e' e
-end.
+Definition plug_exp (e:DHexp) (e':DHexp) : DHexp :=
+  fst (plug_exp_aux e e').
+
+Lemma plug_exp_indicator :
+  forall (e e0 e1:DHexp), snd (plug_exp_aux e e0) = snd (plug_exp_aux e e1).
+Proof.
+induction e.
+intros a0 a1.
+simpl.
+rewrite IHe1 with (e0 := a1) (e2 := a0).
+case_eq (snd (plug_exp_aux e1 a0)); intros; subst; simpl; auto.
+intros.
+case_eq d; intros; subst; simpl; auto.
+Qed.
+
+Lemma non_null_sum :
+  forall n m:nat, n <> 0 -> n + m <> 0.
+Proof.
+intros.
+omega.
+Qed.
+
+Lemma plug_exp_holes :
+  forall (e e':DHexp), snd (plug_exp_aux e e') = true -> hole_exp_number e <> 0.
+induction e; eauto; simpl.
+intros; case_eq (snd (plug_exp_aux e1 e')); intros; subst; simpl; eauto.
+intro.
+rewrite H0 in H.
+specialize (IHe1 e' H0).
+assert (hole_exp_number e1 + hole_exp_number e2 <> 0) by (apply non_null_sum; eauto).
+specialize (H2 H1); trivial.
+
+rewrite H0 in H; simpl in H.
+specialize (IHe2 e' H).
+intro.
+assert (hole_exp_number e1 + hole_exp_number e2 <> 0) by admit. (* plus comm *) 
+specialize (H2 H1); trivial.
+intros.
+intro.
+case_eq d; intros; subst; simpl in *; eauto.
+inversion H.
+inversion H.
+inversion H0.
+Qed.
 
 Lemma cps_plugging :
-  forall (e:DHexp) (t0 t1:DHtriv) (v:var),
+  forall (e:DHexp) (t0 t1:DHtriv) (v:var) (k:Ctriv -> Cexp),
     not (hole_exp_number e = 0) ->
-                  cps_exp_htransform (plug_exp e (DHexp_app t0 t1)) (fun t => Cexp_cont t) =
+                  cps_exp_htransform (plug_exp e (DHexp_app t0 t1)) k =
                   Cexp_app (cps_triv_htransform t0) (cps_triv_htransform t1) v
-                           (cps_exp_htransform (plug_exp e (DHtriv_vvar v)) (fun t => Cexp_cont t)).
+                           (cps_exp_htransform (plug_exp e (DHtriv_vvar v)) k).
 Proof.
-induction e; eauto; simpl; intuition.
+induction e.
+intros.
+unfold plug_exp in *; simpl in *.
+assert (snd (plug_exp_aux e1 (DHexp_app t0 t1)) = snd (plug_exp_aux e1 (DHtriv_vvar v))) by
+    (apply plug_exp_indicator).
+rewrite H0.
+case_eq (snd (plug_exp_aux e1 (DHtriv_vvar v))); intros; subst; simpl; auto.
+rewrite IHe1 with (v := v); simpl.
+trivial.
+apply plug_exp_holes with (e' := DHtriv_vvar v); auto.
 Admitted.
 
 Lemma exp_v_plugging :
   forall (e:Cexp) (de:DHexp) (v:var) (vs:list var),
     CexpValid e (v::vs) -> cps_exp_htransform de (fun t => Cexp_cont t) = e ->
     plug_exp de (DHtriv_vvar v) = de.
+Proof.
+induction de; intros; eauto; intuition; simpl; eauto.
 Admitted.
 
 Lemma holy_exp :
