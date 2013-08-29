@@ -221,13 +221,24 @@ match r with
 end.
 
 Lemma cps_plugging :
-  forall (e:DHexp) (t0 t1:DHtriv),
+  forall (e:DHexp) (t0 t1:DHtriv) (v:var),
     not (hole_exp_number e = 0) ->
                   cps_exp_htransform (plug_exp e (DHexp_app t0 t1)) (fun t => Cexp_cont t) =
-                  Cexp_app (cps_triv_htransform t0) (cps_triv_htransform t1) 0
-                           (cps_exp_htransform e (fun t => Cexp_cont t)).
+                  Cexp_app (cps_triv_htransform t0) (cps_triv_htransform t1) v
+                           (cps_exp_htransform (plug_exp e (DHtriv_vvar v)) (fun t => Cexp_cont t)).
 Proof.
 induction e; eauto; simpl; intuition.
+Admitted.
+
+Lemma exp_v_plugging :
+  forall (e:Cexp) (de:DHexp) (v:var) (vs:list var),
+    CexpValid e (v::vs) -> cps_exp_htransform de (fun t => Cexp_cont t) = e ->
+    plug_exp de (DHtriv_vvar v) = de.
+Admitted.
+
+Lemma holy_exp :
+  forall (e:Cexp) (de:DHexp) (l:list var),
+    CexpValid e l -> cps_exp_htransform de (fun t => Cexp_cont t) = e -> hole_exp_number de = length l.
 Admitted.
 
 Theorem super_theorem : forall r:Croot, CrootValid r -> exists dr:DHroot, cps_htransform dr = r.
@@ -259,8 +270,20 @@ rewrite H; trivial.
 
 destruct H, H0, H1.
 exists (plug_exp x1 (DHexp_app x0 x)).
-rewrite cps_plugging.
+rewrite cps_plugging with (v := v).
 rewrite H.
 rewrite H0.
+rewrite -> exp_v_plugging with (e := e) (vs := ksi2).
 rewrite H1.
+trivial.
+exact c1.
+exact H1.
 
+unfold not.
+intros.
+assert (hole_exp_number x1 = length (v::ksi2)).
+apply holy_exp with (e := e); auto.
+rewrite H2 in H3.
+simpl in H3.
+inversion H3.
+Qed.
