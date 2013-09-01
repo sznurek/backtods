@@ -248,7 +248,6 @@ assert (hole_exp_number e1 + hole_exp_number e2 <> 0) by (apply non_null_sum; ea
 specialize (H2 H1); trivial.
 auto.
 
-
 split.
 intros.
 specialize (IHe2 e').
@@ -312,7 +311,7 @@ induction e; unfold plug_exp in *; intros; simpl in *; eauto; intuition.
 case_eq (snd (plug_exp_aux e1 e')); intros; subst; simpl in *; eauto.
 rewrite IHe1.
 case_eq (hole_exp_number e1); intros; subst; simpl in *.
-specialize (plug_exp_holes e1 e' H); intros.
+specialize ((proj1 (plug_exp_holes e1 e')) H); intros.
 specialize (H1 H0).
 inversion H1.
 rewrite <- plus_assoc.
