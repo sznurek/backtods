@@ -229,27 +229,51 @@ intros.
 omega.
 Qed.
 
+Lemma equi_neg :
+  forall (A B:Prop), (A <-> B) -> ((~A) <-> (~B)).
+Proof.
+intros; tauto.
+Qed.
+
 Lemma plug_exp_holes :
-  forall (e e':DHexp), snd (plug_exp_aux e e') = true -> hole_exp_number e <> 0.
+  forall (e e':DHexp), snd (plug_exp_aux e e') = true <-> hole_exp_number e <> 0.
 induction e; eauto; simpl.
 intros; case_eq (snd (plug_exp_aux e1 e')); intros; subst; simpl; eauto.
+split.
 intro.
-rewrite H0 in H.
-specialize (IHe1 e' H0).
+specialize (IHe1 e').
+destruct IHe1.
+specialize (H1 H).
 assert (hole_exp_number e1 + hole_exp_number e2 <> 0) by (apply non_null_sum; eauto).
 specialize (H2 H1); trivial.
+auto.
 
-rewrite H0 in H; simpl in H.
-specialize (IHe2 e' H).
-intro.
-assert (hole_exp_number e1 + hole_exp_number e2 <> 0) by admit. (* plus comm *) 
-specialize (H2 H1); trivial.
+
+split.
 intros.
+specialize (IHe2 e').
+destruct (IHe2).
+specialize (H1 H0).
+assert (hole_exp_number e1 + hole_exp_number e2 <> 0) by (rewrite plus_comm; apply non_null_sum; eauto).
+trivial.
+
+intros.
+apply IHe2.
+specialize (IHe1 e').
+specialize (equi_neg (snd (plug_exp_aux e1 e') = true) (hole_exp_number e1 <> 0) IHe1); intros.
+destruct H1.
 intro.
+admit. (* Some arithmetic mumbo-jumbo. *)
+
+intros.
+split.
+intros.
 case_eq d; intros; subst; simpl in *; eauto.
 inversion H.
 inversion H.
-inversion H0.
+
+intros.
+case_eq d; intros; subst; simpl in *; eauto.
 Qed.
 
 Lemma cps_plugging :
@@ -276,43 +300,81 @@ Lemma exp_v_plugging :
     CexpValid e (v::vs) -> cps_exp_htransform de (fun t => Cexp_cont t) = e ->
     plug_exp de (DHtriv_vvar v) = de.
 Proof.
-induction de; intros; eauto; intuition; simpl; eauto.
+induction de; intros; eauto; intuition; simpl in *; eauto.
+unfold plug_exp in *; simpl; eauto.
+case_eq (snd (plug_exp_aux de1 (DHtriv_vvar v))); intros; simpl.
 Admitted.
 
-Lemma holy_exp :
-  forall (e:Cexp) (de:DHexp) (l:list var),
-    CexpValid e l -> cps_exp_htransform de (fun t => Cexp_cont t) = e -> hole_exp_number de = length l.
+Lemma plug_holes :
+  forall e e':DHexp, hole_exp_number (plug_exp e e') = pred (hole_exp_number e) + hole_exp_number e'.
+Proof.
+induction e; unfold plug_exp in *; intros; simpl in *; eauto; intuition.
+case_eq (snd (plug_exp_aux e1 e')); intros; subst; simpl in *; eauto.
+rewrite IHe1.
+case_eq (hole_exp_number e1); intros; subst; simpl in *.
+specialize (plug_exp_holes e1 e' H); intros.
+specialize (H1 H0).
+inversion H1.
+rewrite <- plus_assoc.
+rewrite (plus_comm (hole_exp_number e') (hole_exp_number e2)).
+rewrite plus_assoc.
+trivial.
+
+rewrite IHe2; simpl.
+case_eq (hole_exp_number e1); intros; subst; simpl in *; eauto.
+specialize (plug_exp_holes e1 e'); intros.
 Admitted.
 
 Theorem super_theorem : forall r:Croot, CrootValid r -> exists dr:DHroot, cps_htransform dr = r.
 Proof.
 apply (CrootValid_mut (fun r rv => exists dr:DHroot, cps_htransform dr = r)
-                      (fun t l0 l1 tv => exists dt:DHtriv, cps_triv_htransform dt = t)
-                      (fun e l ev => exists de:DHexp, cps_exp_htransform de (fun t => Cexp_cont t) = e))
+                      (fun t l0 l1 tv => exists dt:DHtriv, cps_triv_htransform dt = t /\
+                                         hole_triv_number dt = length l0 - length l1)
+                      (fun e l ev => exists de:DHexp, cps_exp_htransform de (fun t => Cexp_cont t) = e /\
+                                     hole_exp_number de = length l))
 ; eauto; intuition.
 destruct H.
 exists (DHroot_exp x).
 simpl.
-admit.
+admit. (* Strange Coq behavior - I have goal in premises, but exact fails. *)
 
 exists (DHtriv_vvar v).
+split.
 simpl; trivial.
+simpl (length (v :: ksi)).
+rewrite <- minus_Sn_m.
+rewrite minus_diag.
+simpl.
+trivial.
+auto.
+
 
 exists (DHtriv_var x).
+split.
 simpl; trivial.
+rewrite minus_diag; eauto.
 
 destruct H.
 exists (DHtriv_lam x x0).
+split.
 simpl.
 rewrite H; trivial.
+rewrite minus_diag; simpl; eauto.
+
 
 destruct H.
+destruct H.
 exists (x).
+split.
 simpl.
 rewrite H; trivial.
+case_eq x; intros; subst; simpl; eauto; inversion c; subst; simpl; eauto.
 
 destruct H, H0, H1.
+destruct H, H0.
+destruct H1.
 exists (plug_exp x1 (DHexp_app x0 x)).
+split.
 rewrite cps_plugging with (v := v).
 rewrite H.
 rewrite H0.
@@ -321,12 +383,19 @@ rewrite H1.
 trivial.
 exact c1.
 exact H1.
+simpl in H4.
+intro.
+rewrite H5 in H4.
+inversion H4.
 
-unfold not.
+rewrite plug_holes.
+rewrite H4.
+simpl.
+rewrite H3.
+rewrite H2.
+generalize (length ksi0) as n.
+generalize (length ksi1) as m.
+generalize (length ksi2) as p.
 intros.
-assert (hole_exp_number x1 = length (v::ksi2)).
-apply holy_exp with (e := e); auto.
-rewrite H2 in H3.
-simpl in H3.
-inversion H3.
+admit. (* arith with minus... *)
 Qed.
