@@ -324,6 +324,37 @@ case_eq (hole_exp_number e1); intros; subst; simpl in *; eauto.
 specialize (plug_exp_holes e1 e'); intros.
 Admitted.
 
+Lemma minus_lemma :
+  forall (n m p:nat), m <= n -> n <= p -> (n - m) + (p - n) = p - m.
+Proof.
+induction n.
+
+intros.
+simpl.
+inversion H.
+trivial.
+
+intros.
+destruct m; destruct p; simpl in *; eauto.
+inversion H0.
+rewrite le_plus_minus_r; trivial.
+apply le_S_n; trivial.
+rewrite plus_comm; simpl; auto.
+inversion H0.
+specialize (le_S_n m n H).
+specialize (le_S_n n p H0).
+intros.
+specialize (IHn m p H2 H1).
+trivial.
+Qed.
+
+Lemma triv_valid_list_le :
+  forall (t:Ctriv) (l0 l1:list var), CtrivValid t l0 l1 -> length l1 <= length l0.
+Proof.
+intros.
+inversion H; subst; simpl in *; eauto.
+Qed.
+
 Theorem super_theorem : forall r:Croot, CrootValid r -> exists dr:DHroot, cps_htransform dr = r.
 Proof.
 apply (CrootValid_mut (fun r rv => exists dr:DHroot, cps_htransform dr = r)
@@ -392,9 +423,13 @@ rewrite H4.
 simpl.
 rewrite H3.
 rewrite H2.
-generalize (length ksi0) as n.
-generalize (length ksi1) as m.
-generalize (length ksi2) as p.
-intros.
-admit. (* arith with minus... *)
+rewrite minus_lemma.
+rewrite le_plus_minus_r.
+trivial.
+
+apply le_trans with (m := length ksi1).
+apply (triv_valid_list_le t0 ksi1 ksi2 c0).
+apply (triv_valid_list_le t1 ksi0 ksi1 c).
+apply (triv_valid_list_le t0 ksi1 ksi2 c0).
+apply (triv_valid_list_le t1 ksi0 ksi1 c).
 Qed.
