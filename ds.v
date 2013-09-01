@@ -150,44 +150,73 @@ match r with
 | DHroot_exp e => hole_exp_number e
 end.
 
+Fixpoint hole_triv_deep_number (t:DHtriv) : nat :=
+match t with
+| DHtriv_var _   => 0
+| DHtriv_lam _ r => hole_deep_number r
+| DHtriv_vvar _  => 1
+end with hole_exp_deep_number (e:DHexp) : nat :=
+match e with
+| DHexp_triv t    => hole_triv_deep_number t
+| DHexp_app e0 e1 => hole_exp_deep_number e0 + hole_exp_deep_number e1
+end with hole_deep_number (r:DHroot) : nat :=
+match r with
+| DHroot_exp e => hole_exp_deep_number e
+end.
+
+Lemma deep_number_is_stronger :
+  forall e:DHexp, hole_exp_number e <= hole_exp_deep_number e.
+Proof.
+apply (DHexp_mut (fun r => hole_number r <= hole_deep_number r)
+                 (fun e => hole_exp_number e <= hole_exp_deep_number e)
+                 (fun t => hole_triv_number t <= hole_triv_deep_number t))
+;intros;simpl in *; eauto; intuition.
+Qed.
+
 Lemma hole_exp_valid :
-  forall e:DHexp, hole_exp_number e = 0 ->
+  forall e:DHexp, hole_exp_deep_number e = 0 ->
                   exists e':Dexp, forall k:Ctriv -> Cexp,
                                     cps_exp_htransform e k = cps_exp_transform e' k.
 Proof.
-induction e; intros; eauto; intuition.
-inversion H; subst.
-inversion H1; subst.
-assert (hole_exp_number e1 = 0 /\ hole_exp_number e2 = 0).
-apply plus_is_O; trivial.
-destruct H0.
-simpl.
+apply (DHexp_mut (fun r => hole_deep_number r = 0 -> exists r':Droot, cps_htransform r = cps_transform r')
+                 (fun e => hole_exp_deep_number e = 0 ->
+                           exists e':Dexp, forall k:Ctriv -> Cexp,
+                             cps_exp_htransform e k = cps_exp_transform e' k)
+                 (fun t => hole_triv_deep_number t = 0 ->
+                           exists t':Dtriv, cps_triv_htransform t = cps_triv_transform t'))
+; intros; simpl in *; eauto; intuition.
+destruct H1.
+exists (Droot_exp x).
+rewrite H; auto.
 
-specialize (IHe1 H0).
-specialize (IHe2 H3).
-destruct IHe1.
-destruct IHe2.
+specialize (plus_is_O (hole_exp_deep_number d) (hole_exp_deep_number d0) H1); intros.
+destruct H2.
+specialize (H H2).
+specialize (H0 H3).
+destruct H, H0.
 exists (Dexp_app x x0).
 intros.
 simpl.
+rewrite H.
 assert ((fun t0 : Ctriv =>
-      cps_exp_htransform e2
+      cps_exp_htransform d0
         (fun t1 : Ctriv => Cexp_app t0 t1 0 (k (Ctriv_vvar 0)))) = (fun t0 : Ctriv =>
       cps_exp_transform x0
         (fun t1 : Ctriv => Cexp_app t0 t1 0 (k (Ctriv_vvar 0))))).
 apply functional_extensionality.
 intros.
-rewrite H5.
-trivial.
-rewrite H6.
-rewrite H4.
-trivial.
+rewrite H0; auto.
+rewrite H4; auto.
 
-inversion H; subst.
-case_eq d; intros; subst; intuition.
-exists (Dexp_triv (Dtriv_var v)); auto.
-admit.
-inversion H1.
+destruct H1.
+exists x.
+intros.
+rewrite H; auto.
+exists v; simpl; auto.
+destruct H1.
+exists (Dtriv_lam v x).
+rewrite H; auto.
+inversion H.
 Qed.
 
 Fixpoint plug_triv_aux (t:DHtriv) (e:DHexp) : (DHexp * bool) :=
@@ -355,6 +384,7 @@ intros.
 inversion H; subst; simpl in *; eauto.
 Qed.
 
+(* TODO: Use the hole_exp_valid to get main result. *)
 Theorem super_theorem : forall r:Croot, CrootValid r -> exists dr:DHroot, cps_htransform dr = r.
 Proof.
 apply (CrootValid_mut (fun r rv => exists dr:DHroot, cps_htransform dr = r)
