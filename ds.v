@@ -264,6 +264,39 @@ Proof.
 intros; tauto.
 Qed.
 
+Lemma nat_neg_gt :
+  forall n:nat, ~ n > 0 -> n = 0.
+Proof.
+induction n.
+intros; simpl in *; auto.
+intros.
+unfold not in *.
+specialize (H (gt_Sn_O n)).
+inversion H.
+Qed.
+
+Lemma nat_neg_neq :
+  forall n:nat, ~ n <> 0 -> n = 0.
+Proof.
+intros.
+specialize (nat_neg_gt n).
+intros.
+unfold not in *.
+unfold gt in *.
+unfold lt in *.
+apply H0.
+intros.
+destruct n.
+inversion H1.
+assert (forall n:nat, S n <> 0).
+intros.
+intro.
+inversion H2.
+specialize (H2 n).
+specialize (H H2).
+inversion H.
+Qed.
+
 Lemma plug_exp_holes :
   forall (e e':DHexp), snd (plug_exp_aux e e') = true <-> hole_exp_number e <> 0.
 induction e; eauto; simpl.
@@ -288,10 +321,15 @@ trivial.
 intros.
 apply IHe2.
 specialize (IHe1 e').
-specialize (equi_neg (snd (plug_exp_aux e1 e') = true) (hole_exp_number e1 <> 0) IHe1); intros.
-destruct H1.
 intro.
-admit. (* Some arithmetic mumbo-jumbo. *)
+specialize (equi_neg (snd (plug_exp_aux e1 e') = true) (hole_exp_number e1 <> 0) IHe1); intros.
+destruct H2.
+specialize (proj2 (Bool.not_true_iff_false (snd (plug_exp_aux e1 e'))) H); intros.
+specialize (H2 H4).
+specialize (nat_neg_neq (hole_exp_number e1) H2); intros.
+assert (hole_exp_number e1 + hole_exp_number e2 = 0) by (rewrite H1; rewrite H5; simpl ;auto).
+specialize (H0 H6).
+inversion H0.
 
 intros.
 split.
