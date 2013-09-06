@@ -61,16 +61,18 @@ with Dtriv_mut := Induction for Dtriv Sort Type.
 
 Hint Constructors Droot Dexp Dtriv.
 
+Definition Cont := (var -> Ctriv -> Cexp).
+
 Fixpoint cps_transform (r:Droot) : Croot :=
 match r with
-| Droot_exp e => cps_exp_transform e (fun t => Cexp_cont t)
+| Droot_exp e => cps_exp_transform e 0 (fun _ t => Cexp_cont t)
 end
-with cps_exp_transform (e:Dexp) (k:Ctriv -> Cexp) : Cexp :=
+with cps_exp_transform (e:Dexp) (f:var) (k:Cont) : Cexp :=
 match e with
-| Dexp_app e0 e1 => cps_exp_transform e0 (fun t0 =>
-                    cps_exp_transform e1 (fun t1 =>
-                        Cexp_app t0 t1 0 (k (Ctriv_vvar 0))))
-| Dexp_triv t    => k (cps_triv_transform t)
+| Dexp_app e0 e1 => cps_exp_transform e0 f  (fun n0 t0 =>
+                    cps_exp_transform e1 n0 (fun n1 t1 =>
+                        Cexp_app t0 t1 n1 (k (S n1) (Ctriv_vvar n1))))
+| Dexp_triv t    => k f (cps_triv_transform t)
 end
 with cps_triv_transform (t:Dtriv) : Ctriv :=
 match t with
@@ -78,8 +80,9 @@ match t with
 | Dtriv_lam x r => Ctriv_lam x (cps_transform r)
 end.
 
-Definition good_continuation (k:Ctriv -> Cexp) (s:list var) :=
-  forall (t:Ctriv) (s':list var), CtrivValid t s' s -> CexpValid (k t) s'.
+Definition good_continuation (k:Cont) (s:list var) :=
+  forall (v:var) (t:Ctriv) (s':list var),
+    CtrivValid t s' s -> CexpValid (k v t) s'.
 
 Hint Unfold good_continuation.
 
@@ -87,9 +90,9 @@ Theorem cps_transform_valid :
   forall r:Droot, CrootValid (cps_transform r).
 Proof.
 apply (Droot_mut (fun r => CrootValid (cps_transform r))
-                 (fun e => forall (k:Ctriv -> Cexp) (s:list var),
+                 (fun e => forall (v:var) (k:Cont) (s:list var),
                              good_continuation k s ->
-                             CexpValid (cps_exp_transform e k) s)
+                             CexpValid (cps_exp_transform e v k) s)
                  (fun t => forall (s:list var), CtrivValid (cps_triv_transform t) s s));
 intros; unfold good_continuation in *; eauto; simpl; intuition; eauto.
 Qed.
