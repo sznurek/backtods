@@ -172,11 +172,15 @@ simpl; trivial.
 subst.
 exists d.
 unfold mold; simpl.
-admit. (* mold is broken :( *)
+inversion c; subst.
+apply app_produces_vvar.
+unfold is_app_list in H1.
+inversion H1; subst; auto.
 
-admit. (* Just like up, mold is broken, but case is trivial. *)
+destruct H2; destruct H; subst.
+exists x.
+unfold mold; simpl.
+symmetry in H0.
+specialize (length_zero_is_nil es H0); intros; subst; simpl; auto.
 
-destruct H4; destruct H; subst.
-simpl in *.
-specialize (H1 (Dexp_app x x0::es)).
-simpl in H1.
+Admitted.
