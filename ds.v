@@ -12,7 +12,7 @@ with Cexp : Set :=
 | Cexp_app  : Ctriv -> Ctriv -> var -> Cexp -> Cexp
 with Ctriv : Set :=
 | Ctriv_var : var -> Ctriv
-| Ctriv_vvar : Ctriv
+| Ctriv_vvar : var -> Ctriv
 | Ctriv_lam : var -> Croot -> Ctriv.
 
 Coercion Croot_exp : Cexp >-> Croot.
@@ -22,12 +22,12 @@ Inductive CrootValid : Croot -> Prop :=
 | CrootValid_exp : forall e:Cexp, CexpValid e nil -> CrootValid e
 with CexpValid : Cexp -> list var -> Prop :=
 | CexpValid_cont : forall (ksi:list var) (t:Ctriv), CtrivValid t ksi nil -> CexpValid (Cexp_cont t) ksi
-| CexpValid_app  : forall (ksi0 ksi1 ksi2:list var) (t0 t1:Ctriv) (e:Cexp),
+| CexpValid_app  : forall (ksi0 ksi1 ksi2:list var) (t0 t1:Ctriv) (v:var) (e:Cexp),
                      CtrivValid t1 ksi0 ksi1 -> CtrivValid t0 ksi1 ksi2 ->
-                     CexpValid e (0::ksi2) ->
+                     CexpValid e (v::ksi2) ->
                      CexpValid (Cexp_app t0 t1 0 e) ksi0
 with CtrivValid : Ctriv -> list var -> list var -> Prop :=
-| CtrivValid_vvar : forall (ksi:list var) (v:var), CtrivValid Ctriv_vvar (v::ksi) ksi
+| CtrivValid_vvar : forall (ksi:list var) (v:var), CtrivValid (Ctriv_vvar v) (v::ksi) ksi
 | CtrivValid_var  : forall (ksi:list var) (x:var), CtrivValid (Ctriv_var x) ksi ksi
 | CtrivValid_lam  : forall (ksi:list var) (x:var) (r:Croot), CrootValid r -> CtrivValid (Ctriv_lam x r) ksi ksi.
 
@@ -61,18 +61,18 @@ with Dtriv_mut := Induction for Dtriv Sort Type.
 
 Hint Constructors Droot Dexp Dtriv.
 
-Definition Cont := Ctriv -> Cexp.
+Definition Cont := var -> Ctriv -> Cexp.
 
 Fixpoint cps_transform (r:Droot) : Croot :=
 match r with
-| Droot_exp e => cps_exp_transform e (fun t => Cexp_cont t)
+| Droot_exp e => cps_exp_transform 0 e (fun _ t => Cexp_cont t)
 end
-with cps_exp_transform (e:Dexp) (k:Cont) : Cexp :=
+with cps_exp_transform (f:var) (e:Dexp) (k:Cont) : Cexp :=
 match e with
-| Dexp_app e0 e1 => cps_exp_transform e0 (fun t0 =>
-                    cps_exp_transform e1 (fun t1 =>
-                        Cexp_app t0 t1 0 (k Ctriv_vvar)))
-| Dexp_triv t    => k (cps_triv_transform t)
+| Dexp_app e0 e1 => cps_exp_transform (S f) e0 (fun f0 t0 =>
+                    cps_exp_transform f0 e1 (fun f1 t1 =>
+                        Cexp_app t0 t1 0 (k (S f1) (Ctriv_vvar f1))))
+| Dexp_triv t    => k f (cps_triv_transform t)
 end
 with cps_triv_transform (t:Dtriv) : Ctriv :=
 match t with
@@ -81,8 +81,8 @@ match t with
 end.
 
 Definition good_continuation (k:Cont) (s:list var) :=
-  forall (t:Ctriv) (s':list var),
-    CtrivValid t s' s -> CexpValid (k t) s'.
+  forall (f:var) (t:Ctriv) (s':list var),
+    CtrivValid t s' s -> CexpValid (k f t) s'.
 
 Hint Unfold good_continuation.
 
@@ -90,12 +90,37 @@ Theorem cps_transform_valid :
   forall r:Droot, CrootValid (cps_transform r).
 Proof.
 apply (Droot_mut (fun r => CrootValid (cps_transform r))
-                 (fun e => forall (k:Cont) (s:list var),
+                 (fun e => forall (k:Cont) (f:var) (s:list var),
                              good_continuation k s ->
-                             CexpValid (cps_exp_transform e k) s)
+                             CexpValid (cps_exp_transform f e k) s)
                  (fun t => forall (s:list var), CtrivValid (cps_triv_transform t) s s));
 intros; unfold good_continuation in *; simpl; eauto.
 Qed.
+
+Lemma equal_arguments :
+  forall {A B:Type} (f:A -> B) (x y:A), x = y -> f x = f y.
+Proof.
+intros; eauto.
+rewrite H; auto.
+Qed.
+
+Fixpoint rename_v (v:var) (r:Croot) : Croot :=
+match r with
+| Croot_exp e => Croot_exp (rename_exp_v v e)
+end
+with rename_exp_v (v:var) (e:Cexp) : Cexp :=
+match e with
+| Cexp_cont t          => Cexp_cont (rename_triv_v v t)
+| Cexp_app t0 t1 v' e' => let t0' := rename_triv_v v t0 in
+                          let t1' := rename_triv_v v t1 in
+                          Cexp_app t0' t1' v (rename_exp_v v e')
+end
+with rename_triv_v (v:var) (t:Ctriv) : Ctriv :=
+match t with
+| Ctriv_var x   => Ctriv_var x
+| Ctriv_lam x r => Ctriv_lam x (rename_v v r)
+| Ctriv_vvar _  => Ctriv_vvar v
+end.
 
 Lemma length_zero_is_nil :
   forall {A:Type} (es:list A), length es = 0 -> es = nil.
@@ -117,13 +142,14 @@ Definition is_app_list (es:list Dexp) : Prop :=
   Forall is_app es.
 
 Lemma app_produces_vvar :
-  forall (e:Dexp) (k:Cont),
-    is_app e -> cps_exp_transform e k =
-                cps_exp_transform e (fun _ => k Ctriv_vvar).
+  forall (e:Dexp) (k:Cont) (f:var),
+    is_app e -> exists (v:var), cps_exp_transform f e k =
+                cps_exp_transform f e (fun n _ => k n (Ctriv_vvar v)).
 Proof.
-induction e; intros; simpl in *; eauto.
+induction e; intros; eauto.
+specialize (IHe1 (fun n0 t0 => cps_exp_transform n0 e2 k) f).
 inversion H.
-Qed.
+Admitted.
 
 Lemma has_exactly_one_element :
   forall {A:Type} (es:list A), length es = 1 -> exists a:A, es = a :: nil.
@@ -160,51 +186,55 @@ trivial.
 exists a; exists a0; exists (a1::es); trivial.
 Qed.
 
-Lemma equal_arguments :
-  forall {A B:Type} (f:A -> B) (x y:A), x = y -> f x = f y.
-Proof.
-intros; eauto.
-rewrite H; auto.
-Qed.
+Definition mold (f:var) (rest:Cexp) (e:Dexp) : Cexp :=
+  cps_exp_transform f e (fun _ t => rest).
 
-Definition mold (rest:Cexp) (e:Dexp) : Cexp :=
-  cps_exp_transform e (fun t => rest).
+Definition a_eq (r1:Croot) (r2:Croot) := rename_v 0 r1 = rename_v 0 r2.
+Definition a_exp_eq (e1:Cexp) (e2:Cexp) := rename_exp_v 0 e1 = rename_exp_v 0 e2.
+Definition a_triv_eq (t1:Ctriv) (t2:Ctriv) :=
+  rename_triv_v 0 t1 = rename_triv_v 0 t2.
 
 Theorem cps_inverse_exists :
-  forall r:Croot, CrootValid r -> exists r':Droot, cps_transform r' = r.
+  forall r:Croot, CrootValid r -> exists r':Droot, a_eq (cps_transform r') r.
 Proof.
 apply (CrootValid_mut
-         (fun r rv => exists r':Droot, cps_transform r' = r)
-         (fun t l0 l1 tv => ((exists e, l0 = e::l1) /\ t = Ctriv_vvar) \/
-                            (exists e, cps_triv_transform e = t /\ l0 = l1))
-         (fun e l ev => forall (es:list Dexp),
+         (fun r rv => exists r':Droot, a_eq (cps_transform r') r)
+         (fun t l0 l1 tv => ((exists e, l0 = e::l1) /\ (exists v, t = Ctriv_vvar v)) \/
+                            (exists e, a_triv_eq (cps_triv_transform e) t /\ l0 = l1))
+         (fun e l ev => forall (f:var) (es:list Dexp),
            length l = length es -> is_app_list es ->
            exists e':Dexp,
-             cps_exp_transform e' (fun t => Cexp_cont t) =
-             fold_left mold es e))
+             a_exp_eq (cps_exp_transform f e' (fun _ t => Cexp_cont t))
+             (fold_left (mold f) es e)))
 ;intros; eauto; simpl in *.
 
-specialize (H nil).
+specialize (H 0 nil).
 simpl in H.
 specialize (H eq_refl (Forall_nil is_app)).
 destruct H.
 exists (Droot_exp x).
+simpl.
+unfold a_eq.
+unfold a_exp_eq in H.
 simpl.
 rewrite H.
 trivial.
 
 right.
 exists x.
-simpl; auto.
+simpl; split; unfold a_triv_eq; simpl; auto.
 
 right.
 destruct H as [r'].
 exists (Dtriv_lam x r').
-simpl; rewrite H; auto.
+unfold a_eq in H; simpl in H.
+unfold a_triv_eq; split; simpl; auto.
+rewrite H; trivial.
 
 destruct H.
 destruct H.
 destruct H.
+destruct H2.
 subst.
 simpl in H0.
 symmetry in H0.
@@ -214,32 +244,41 @@ destruct H as [d]; subst.
 exists d.
 unfold mold; simpl.
 inversion c; subst.
-apply app_produces_vvar.
+specialize (app_produces_vvar d (fun _ t => Cexp_cont t) f); intros.
 unfold is_app_list in H1.
-inversion H1; subst; auto.
+inversion H1; subst.
+specialize (H H4).
+destruct H.
+rewrite H.
+unfold a_exp_eq; simpl.
+admit. (* continuation v variable is whatever under the a_exp_eq *)
+
 
 destruct H; destruct H; subst.
 exists x.
 unfold mold; simpl.
 symmetry in H0.
 specialize (length_zero_is_nil es H0); intros; subst; simpl; auto.
+unfold a_exp_eq; simpl.
+unfold a_triv_eq in H.
+rewrite H; auto.
 
 intuition.
-destruct H; destruct H0; subst; simpl in *; subst.
+destruct H, H0, H5, H6; subst; simpl in *; subst.
 symmetry in H2.
 specialize (has_two_elements es (length ksi2) H2); intros.
 destruct H.
 destruct H.
 destruct H.
 subst.
-specialize (H1 (Dexp_app x2 x1::x3)).
+specialize (H1 (S f) (Dexp_app x4 x3::x5)).
 simpl in H1.
 simpl in H2.
 inversion H2.
 rewrite H0 in H1.
 specialize (H1 eq_refl).
 
-assert (is_app_list (Dexp_app x2 x1 :: x3)).
+assert (is_app_list (Dexp_app x4 x3 :: x5)).
 constructor.
 unfold is_app; simpl; auto.
 inversion H3; subst.
@@ -248,13 +287,14 @@ trivial.
 
 specialize (H1 H).
 destruct H1.
-exists x4.
+exists x6.
 simpl.
+unfold a_exp_eq in H1.
+unfold a_exp_eq.
 rewrite H1.
 unfold mold.
 simpl.
 
-rewrite app_produces_vvar.
 apply equal_arguments.
 apply equal_arguments.
 
