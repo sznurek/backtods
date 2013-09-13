@@ -100,8 +100,8 @@ Qed.
 Lemma length_zero_is_nil :
   forall {A:Type} (es:list A), length es = 0 -> es = nil.
 Proof.
-intros.
-destruct es.
+intros A es H.
+destruct es as [| x xs].
 trivial.
 simpl in H.
 inversion H.
@@ -128,18 +128,18 @@ Qed.
 Lemma has_exactly_one_element :
   forall {A:Type} (es:list A), length es = 1 -> exists a:A, es = a :: nil.
 Proof.
-intros; destruct es; auto.
+intros A es H; destruct es as [|x xs]; auto.
 inversion H.
-exists a.
+exists x.
 simpl in H.
-assert (length es = 0).
-replace (length es) with (pred (S (length es))).
+assert (length xs = 0).
+replace (length xs) with (pred (S (length xs))).
 replace 0 with (pred (S 0)).
 rewrite H.
 trivial.
 trivial.
 trivial.
-destruct es; auto.
+destruct xs; auto.
 inversion H0.
 Qed.
 
@@ -198,8 +198,8 @@ exists x.
 simpl; auto.
 
 right.
-destruct H.
-exists (Dtriv_lam x x0).
+destruct H as [r'].
+exists (Dtriv_lam x r').
 simpl; rewrite H; auto.
 
 destruct H.
@@ -208,17 +208,9 @@ destruct H.
 subst.
 simpl in H0.
 symmetry in H0.
-destruct es.
-inversion H0.
+specialize (has_exactly_one_element es H0); intros.
+destruct H as [d]; subst.
 
-assert (es = nil).
-apply length_zero_is_nil.
-replace (length es) with (pred (S (length es))).
-replace 0 with (pred (S 0)).
-simpl in H0; rewrite H0; simpl; trivial.
-simpl; trivial.
-simpl; trivial.
-subst.
 exists d.
 unfold mold; simpl.
 inversion c; subst.
@@ -233,7 +225,7 @@ symmetry in H0.
 specialize (length_zero_is_nil es H0); intros; subst; simpl; auto.
 
 intuition.
-destruct H; destruct H0; subst; simpl in *.
+destruct H; destruct H0; subst; simpl in *; subst.
 symmetry in H2.
 specialize (has_two_elements es (length ksi2) H2); intros.
 destruct H.
