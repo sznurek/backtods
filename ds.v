@@ -94,11 +94,8 @@ apply (Droot_mut (fun r => CrootValid (cps_transform r))
                              good_continuation k s ->
                              CexpValid (cps_exp_transform e k) s)
                  (fun t => forall (s:list var), CtrivValid (cps_triv_transform t) s s));
-intros; unfold good_continuation in *; eauto; simpl; intuition; eauto.
+intros; unfold good_continuation in *; simpl; eauto.
 Qed.
-
-Definition mold (rest:Cexp) (e:Dexp) : Cexp :=
-  cps_exp_transform e (fun t => rest).
 
 Lemma length_zero_is_nil :
   forall {A:Type} (es:list A), length es = 0 -> es = nil.
@@ -128,6 +125,24 @@ induction e; intros; simpl in *; eauto.
 inversion H.
 Qed.
 
+Lemma has_exactly_one_element :
+  forall {A:Type} (es:list A), length es = 1 -> exists a:A, es = a :: nil.
+Proof.
+intros; destruct es; auto.
+inversion H.
+exists a.
+simpl in H.
+assert (length es = 0).
+replace (length es) with (pred (S (length es))).
+replace 0 with (pred (S 0)).
+rewrite H.
+trivial.
+trivial.
+trivial.
+destruct es; auto.
+inversion H0.
+Qed.
+
 Lemma has_two_elements :
   forall {A:Type} (es:list A) (n:nat), length es = S (S n) ->
          exists (a b:A), exists es':list A, es = a::b::es'.
@@ -152,6 +167,9 @@ intros; eauto.
 rewrite H; auto.
 Qed.
 
+Definition mold (rest:Cexp) (e:Dexp) : Cexp :=
+  cps_exp_transform e (fun t => rest).
+
 Theorem cps_inverse_exists :
   forall r:Croot, CrootValid r -> exists r':Droot, cps_transform r' = r.
 Proof.
@@ -172,7 +190,8 @@ specialize (H eq_refl (Forall_nil is_app)).
 destruct H.
 exists (Droot_exp x).
 simpl.
-admit. (*exact H.*)
+rewrite H.
+trivial.
 
 right.
 exists x.
