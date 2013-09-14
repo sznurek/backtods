@@ -2,6 +2,7 @@ Require Import List.
 Require Import Arith.Plus.
 Require Import ZArith.
 Require Import FunctionalExtensionality.
+Require Import Setoid.
 
 Definition var := nat.
 
@@ -25,7 +26,7 @@ with CexpValid : Cexp -> list var -> Prop :=
 | CexpValid_app  : forall (ksi0 ksi1 ksi2:list var) (t0 t1:Ctriv) (v:var) (e:Cexp),
                      CtrivValid t1 ksi0 ksi1 -> CtrivValid t0 ksi1 ksi2 ->
                      CexpValid e (v::ksi2) ->
-                     CexpValid (Cexp_app t0 t1 0 e) ksi0
+                     CexpValid (Cexp_app t0 t1 v e) ksi0
 with CtrivValid : Ctriv -> list var -> list var -> Prop :=
 | CtrivValid_vvar : forall (ksi:list var) (v:var), CtrivValid (Ctriv_vvar v) (v::ksi) ksi
 | CtrivValid_var  : forall (ksi:list var) (x:var), CtrivValid (Ctriv_var x) ksi ksi
@@ -71,7 +72,7 @@ with cps_exp_transform (f:var) (e:Dexp) (k:Cont) : Cexp :=
 match e with
 | Dexp_app e0 e1 => cps_exp_transform (S f) e0 (fun f0 t0 =>
                     cps_exp_transform f0 e1 (fun f1 t1 =>
-                        Cexp_app t0 t1 0 (k (S f1) (Ctriv_vvar f1))))
+                        Cexp_app t0 t1 f1 (k (S f1) (Ctriv_vvar f1))))
 | Dexp_triv t    => k f (cps_triv_transform t)
 end
 with cps_triv_transform (t:Dtriv) : Ctriv :=
@@ -96,6 +97,8 @@ apply (Droot_mut (fun r => CrootValid (cps_transform r))
                  (fun t => forall (s:list var), CtrivValid (cps_triv_transform t) s s));
 intros; unfold good_continuation in *; simpl; eauto.
 Qed.
+
+(* Main development below *)
 
 Lemma equal_arguments :
   forall {A B:Type} (f:A -> B) (x y:A), x = y -> f x = f y.
@@ -122,6 +125,38 @@ match t with
 | Ctriv_vvar _  => Ctriv_vvar v
 end.
 
+Definition a_eq (r1:Croot) (r2:Croot) := rename_v 0 r1 = rename_v 0 r2.
+Definition a_exp_eq (e1:Cexp) (e2:Cexp) := rename_exp_v 0 e1 = rename_exp_v 0 e2.
+Definition a_triv_eq (t1:Ctriv) (t2:Ctriv) :=
+  rename_triv_v 0 t1 = rename_triv_v 0 t2.
+
+Lemma a_eq_refl :
+  forall r:Croot, a_eq r r.
+Proof.
+intros; unfold a_eq; simpl; eauto.
+Qed.
+
+Lemma a_eq_sym :
+  forall r1 r2:Croot, a_eq r1 r2 -> a_eq r2 r1.
+Proof.
+intros; unfold a_eq in *; rewrite H; eauto.
+Qed.
+
+Lemma a_eq_trans :
+  forall r1 r2 r3:Croot, a_eq r1 r2 -> a_eq r2 r3 -> a_eq r1 r3.
+Proof.
+intros; unfold a_eq in *.
+rewrite H.
+rewrite H0.
+auto.
+Qed.
+
+Add Relation Croot a_eq
+reflexivity  proved by a_eq_refl
+symmetry proved by a_eq_sym
+transitivity proved by a_eq_trans
+as a_eq_rel.
+
 Lemma length_zero_is_nil :
   forall {A:Type} (es:list A), length es = 0 -> es = nil.
 Proof.
@@ -141,14 +176,69 @@ end.
 Definition is_app_list (es:list Dexp) : Prop :=
   Forall is_app es.
 
+Lemma rename_under_cps :
+  forall (e:Dexp) (k:Cont) (f f' v:var),
+    rename_exp_v v (cps_exp_transform f e k) =
+    rename_exp_v v (cps_exp_transform f e (fun _ t => rename_exp_v v (k f' t))).
+Proof.
+
 Lemma app_produces_vvar :
   forall (e:Dexp) (k:Cont) (f:var),
-    is_app e -> exists (v:var), cps_exp_transform f e k =
-                cps_exp_transform f e (fun n _ => k n (Ctriv_vvar v)).
+    is_app e -> a_exp_eq (cps_exp_transform f e k)
+                  (cps_exp_transform f e (fun n _ => k n (Ctriv_vvar 0))).
 Proof.
 induction e; intros; eauto.
-specialize (IHe1 (fun n0 t0 => cps_exp_transform n0 e2 k) f).
-inversion H.
+unfold a_exp_eq in *; simpl.
+rewrite IHe1.
+Admitted.
+
+Lemma app_produces_vvar2 :
+  forall (e:Dexp) (k:Cont) (f:var),
+    is_app e -> exists v:var, cps_exp_transform f e k =
+                              cps_exp_transform f e (fun n _ => k n (Ctriv_vvar v)).
+Proof.
+induction e; intros.
+case_eq e1; case_eq e2; intros; subst; eauto.
+
+specialize (IHe1 (fun n t => cps_exp_transform n (Dexp_app d d0)
+                               (fun f1 t1 => Cexp_app t t1 f1 (k (S f1) (Ctriv_vvar f1))))
+            (S f) I).
+destruct IHe1.
+Admitted.
+
+Lemma app_produces_vvar3 :
+  forall (e:Dexp) (k:Cont) (v f f':var), is_app e ->
+    rename_exp_v v (cps_exp_transform f e k) =
+    rename_exp_v v (cps_exp_transform f e (fun _ _ => k f' (Ctriv_vvar v))).
+Proof.
+Admitted.
+
+Lemma start_irrevelant :
+  forall (e:Dexp) (k:Cont) (f f':var),
+    a_exp_eq (cps_exp_transform f e k) (cps_exp_transform f' e k).
+Proof.
+Admitted.
+
+Lemma continuation_v_eq :
+  forall (e:Dexp) (f:var) (v v' v'':var),
+    rename_exp_v v (cps_exp_transform f e (fun _ _ => Cexp_cont (Ctriv_vvar v'))) =
+    rename_exp_v v (cps_exp_transform f e (fun _ _ => Cexp_cont (Ctriv_vvar v''))).
+Proof.
+Admitted.
+
+Lemma continuation_rename :
+  forall (e:Dexp) (k:Cont) (v f:var),
+    rename_exp_v v (cps_exp_transform f e k) =
+    rename_exp_v v (cps_exp_transform f e (fun n t => rename_exp_v v (k n t))).
+Proof.
+Admitted.
+
+Definition mold (rest:Cexp) (e:Dexp) : Cexp :=
+  cps_exp_transform 0 e (fun _ t => rest).
+
+Lemma fold_left_is_right :
+  forall (c c':Cexp) (ds:list Dexp), a_exp_eq c c' -> a_exp_eq (fold_left mold ds c) (fold_left mold ds c').
+Proof.
 Admitted.
 
 Lemma has_exactly_one_element :
@@ -186,14 +276,6 @@ trivial.
 exists a; exists a0; exists (a1::es); trivial.
 Qed.
 
-Definition mold (f:var) (rest:Cexp) (e:Dexp) : Cexp :=
-  cps_exp_transform f e (fun _ t => rest).
-
-Definition a_eq (r1:Croot) (r2:Croot) := rename_v 0 r1 = rename_v 0 r2.
-Definition a_exp_eq (e1:Cexp) (e2:Cexp) := rename_exp_v 0 e1 = rename_exp_v 0 e2.
-Definition a_triv_eq (t1:Ctriv) (t2:Ctriv) :=
-  rename_triv_v 0 t1 = rename_triv_v 0 t2.
-
 Theorem cps_inverse_exists :
   forall r:Croot, CrootValid r -> exists r':Droot, a_eq (cps_transform r') r.
 Proof.
@@ -205,7 +287,7 @@ apply (CrootValid_mut
            length l = length es -> is_app_list es ->
            exists e':Dexp,
              a_exp_eq (cps_exp_transform f e' (fun _ t => Cexp_cont t))
-             (fold_left (mold f) es e)))
+             (fold_left mold es e)))
 ;intros; eauto; simpl in *.
 
 specialize (H 0 nil).
@@ -248,10 +330,11 @@ specialize (app_produces_vvar d (fun _ t => Cexp_cont t) f); intros.
 unfold is_app_list in H1.
 inversion H1; subst.
 specialize (H H4).
-destruct H.
+unfold a_exp_eq in *.
 rewrite H.
 unfold a_exp_eq; simpl.
-admit. (* continuation v variable is whatever under the a_exp_eq *)
+rewrite start_irrevelant with (f := f) (f' := 0).
+rewrite continuation_v_eq with (v'' := x); auto.
 
 
 destruct H; destruct H; subst.
@@ -271,7 +354,7 @@ destruct H.
 destruct H.
 destruct H.
 subst.
-specialize (H1 (S f) (Dexp_app x4 x3::x5)).
+specialize (H1 f (Dexp_app x4 x3::x5)).
 simpl in H1.
 simpl in H2.
 inversion H2.
@@ -286,23 +369,29 @@ inversion H6; subst.
 trivial.
 
 specialize (H1 H).
-destruct H1.
-exists x6.
+destruct H1 as [e'].
+exists e'.
 simpl.
 unfold a_exp_eq in H1.
 unfold a_exp_eq.
 rewrite H1.
-unfold mold.
+rewrite fold_left_is_right with (c' :=(mold (mold (Cexp_app (Ctriv_vvar x2) (Ctriv_vvar x1) v e) x3) x4 )).
+auto.
+
+unfold a_exp_eq.
+unfold mold; simpl.
+rewrite start_irrevelant with (e := x4) (f := 1) (f' := 0).
+rewrite app_produces_vvar3 with (f' := 0).
+rewrite continuation_rename.
+rewrite app_produces_vvar3 with (f' := 0) (e := x3).
+rewrite continuation_rename with (e := x3).
+symmetry.
+rewrite continuation_rename.
+rewrite continuation_rename with (e := x3).
 simpl.
-
-apply equal_arguments.
-apply equal_arguments.
-
-apply functional_extensionality; intros.
-rewrite app_produces_vvar.
-apply equal_arguments.
-apply functional_extensionality; intros.
-trivial.
+auto.
+admit. (* is_app something thivially true. *)
+admit.
 
 
 inversion H3; trivial.
