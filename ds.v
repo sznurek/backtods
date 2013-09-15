@@ -167,29 +167,35 @@ Definition nice_continuation (k:Cont) :=
   (forall (v n n' v0 v1:var), rename_exp_v v (k n (Ctriv_vvar v0)) = rename_exp_v v (k n' (Ctriv_vvar v1))) /\
   (forall (v n n':var) (t:Ctriv), rename_exp_v v (k n t) = rename_exp_v v (k n' t)).
 
+Ltac destruct_exists :=
+repeat match goal with
+| [ H : exists _, _ |- _ ] => destruct H
+end.
+
+Ltac nice_cont := unfold nice_continuation; split; intros; simpl; eauto.
+
+Ltac level_down :=
+  apply equal_arguments; try (apply equal_arguments);
+   try (apply functional_extensionality; intros); try (apply functional_extensionality; intros).
+
 Lemma continuation_rename :
   forall (e:Dexp) (k:Cont) (v n f f':var), nice_continuation k ->
     rename_exp_v v (cps_exp_transform f e k) =
     rename_exp_v v (cps_exp_transform f' e (fun _ t => rename_exp_v v (k n t))).
 Proof.
-induction e; intros; unfold nice_continuation in *; simpl; eauto; intuition.
-rewrite IHe1 with (n := 0) (f' := 0).
+Hint Rewrite rename_exp_v_inv : rename.
+induction e; intros; unfold nice_continuation in *; simpl; eauto; intuition; autorewrite with rename.
+rewrite IHe1 with (n := 0) (f' := 0); autorewrite with rename.
 symmetry.
-rewrite IHe1 with (n := 0) (f' := 0).
-apply equal_arguments.
-apply equal_arguments.
-apply functional_extensionality; intros.
-apply functional_extensionality; intros.
-rewrite IHe2 with (n := 0) (f' := 0).
+rewrite IHe1 with (n := 0) (f' := 0); autorewrite with rename.
+level_down.
+rewrite IHe2 with (n := 0) (f' := 0); autorewrite with rename.
 symmetry.
-rewrite IHe2 with (n := 0) (f' := 0).
+rewrite IHe2 with (n := 0) (f' := 0); autorewrite with rename.
 simpl.
-apply equal_arguments.
-apply equal_arguments.
-apply functional_extensionality; intros.
-apply functional_extensionality; intros.
-simpl.
-rewrite rename_exp_v_inv.
+level_down.
+
+autorewrite with rename.
 rewrite H0 with (n' := n) (v1 := 0); auto.
 split; intros; simpl.
 rewrite H0 with (n' := S n') (v1 := n'); auto.
@@ -262,7 +268,6 @@ split; intros; simpl.
 rewrite H0 with (n' := S n'0) (v1 := n'0); auto.
 rewrite H0 with (n' := S n'0) (v1 := n'0); auto.
 
-rewrite rename_exp_v_inv.
 rewrite H1 with (n' := n); auto.
 Qed.
 
@@ -435,19 +440,6 @@ trivial.
 exists a; exists a0; exists (a1::es); trivial.
 Qed.
 
-Ltac destruct_exists :=
-repeat match goal with
-| [ H : exists _, _ |- _ ] => destruct H
-end.
-
-Ltac nice_cont := unfold nice_continuation; split; intros; simpl; eauto.
-
-Ltac level_down :=
-  apply equal_arguments; try (apply equal_arguments);
-   try (apply functional_extensionality; intros); try (apply functional_extensionality; intros).
-
-Ltac cont_rename := rewrite continuation_rename_0; [ idtac | nice_cont ].
-
 Lemma start_irrevelant :
   forall (e:Dexp) (k:Cont) (v f f':var), nice_continuation k ->
     rename_exp_v v (cps_exp_transform f e k) = rename_exp_v v (cps_exp_transform f' e k).
@@ -460,6 +452,8 @@ auto.
 auto.
 auto.
 Qed.
+
+Ltac cont_rename := rewrite continuation_rename_0; [ idtac | nice_cont ].
 
 Theorem cps_inverse_exists :
   forall r:Croot, CrootValid r -> exists r':Droot, a_eq (cps_transform r') r.
@@ -539,9 +533,8 @@ specialize (length_zero_is_nil es H0); intros; subst.
 simpl; auto.
 
 (* Cexp_app case *)
-intuition; destruct_exists; subst; simpl in *.
+intuition; destruct_exists; subst; simpl in *; symmetry in H2.
 (* v v case *)
-symmetry in H2.
 specialize (has_two_elements es (length ksi2) H2); intros; destruct_exists; subst; simpl in *.
 specialize (H1 f (Dexp_app x4 x3::x5)).
 simpl in H1.
@@ -608,8 +601,96 @@ nice_cont.
 nice_cont.
 
 (* v t case *)
+destruct H0; subst.
+destruct es; [inversion H2 | idtac]; simpl in *.
+specialize (H1 f (Dexp_app x d::es)).
+inversion H2.
+simpl in H1; rewrite H4 in H1.
+specialize (H1 eq_refl).
 
+inversion H3; subst.
+assert (is_app_list (Dexp_app x d :: es)).
+constructor; simpl; eauto.
 
+specialize (H1 H0).
+destruct H1 as [e'].
+exists e'.
+unfold a_exp_eq in *.
+rewrite H1.
+apply fold_left_is_right.
+unfold mold.
+unfold a_exp_eq.
 
-Admitted.
+assert (nice_continuation (fun _ _ => Cexp_app t0 (Ctriv_vvar x0) v e)) by nice_cont.
 
+simpl.
+cont_rename.
+symmetry.
+cont_rename.
+simpl.
+unfold a_triv_eq in H; rewrite H; auto.
+
+symmetry.
+rewrite app_produces_vvar with (f' := 0).
+simpl; auto.
+auto.
+nice_cont.
+
+(* t v case *)
+destruct H4; subst.
+destruct es; [inversion H2 | idtac]; simpl in *.
+specialize (H1 f (Dexp_app d x1 ::es)).
+inversion H2.
+simpl in H1; rewrite H4 in H1.
+specialize (H1 eq_refl).
+
+inversion H3; subst.
+assert (is_app_list (Dexp_app d x1 :: es)).
+constructor; simpl; eauto.
+
+specialize (H1 H0).
+destruct H1 as [e'].
+exists e'.
+unfold a_exp_eq in *.
+rewrite H1.
+apply fold_left_is_right.
+unfold mold.
+unfold a_exp_eq.
+
+assert (nice_continuation (fun _ _ => Cexp_app t1 (Ctriv_vvar x0) v e)) by nice_cont.
+
+simpl.
+cont_rename.
+symmetry.
+cont_rename.
+simpl.
+
+unfold a_triv_eq in H.
+symmetry.
+rewrite app_produces_vvar with (f' := 0).
+simpl; auto.
+rewrite <- H.
+simpl; eauto.
+auto.
+nice_cont.
+
+destruct H0; destruct H; subst.
+rewrite <- H2 in H1.
+specialize (H1 f (Dexp_app x x0 :: es) eq_refl).
+
+assert (is_app_list (Dexp_app x x0 :: es)).
+constructor; simpl; eauto.
+
+specialize (H1 H4).
+destruct H1 as [e'].
+exists e'.
+unfold a_exp_eq in *.
+rewrite H1.
+simpl.
+unfold a_triv_eq in *.
+apply fold_left_is_right.
+unfold a_exp_eq; simpl.
+rewrite H0.
+rewrite H; auto.
+
+Qed.
