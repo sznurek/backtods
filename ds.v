@@ -293,50 +293,18 @@ rewrite rename_exp_v_inv.
 rewrite H1 with (n' := n); auto.
 Qed.
 
-Lemma app_produces_vvar :
-  forall (e:Dexp) (k:Cont) (f:var),
-    nice_continuation k -> is_app e -> a_exp_eq (cps_exp_transform f e k)
-                  (cps_exp_transform f e (fun n _ => k n (Ctriv_vvar 0))).
+Lemma continuation_rename_0 :
+  forall (e:Dexp) (k:Cont) (v f:var), nice_continuation k ->
+    rename_exp_v v (cps_exp_transform f e k) =
+    rename_exp_v v (cps_exp_transform 0 e (fun _ t => rename_exp_v v (k 0 t))).
 Proof.
-induction e; intros; eauto; unfold nice_continuation in *; intuition.
-unfold a_exp_eq in *; simpl.
-rewrite continuation_rename with (e := e1) (f' := 0) (n := 0).
-symmetry.
-rewrite continuation_rename with (e := e1) (f' := 0) (n := 0).
+intros; rewrite continuation_rename with (n := 0) (f' := 0); eauto.
+Qed.
 
-apply equal_arguments.
-apply equal_arguments.
-apply functional_extensionality; intros.
-apply functional_extensionality; intros.
-
-rewrite continuation_rename with (e := e2) (f' := S f) (n := 0).
-symmetry.
-rewrite continuation_rename with (e := e2) (f' := S f) (n := 0).
-auto.
-
-split; intros; simpl.
-Admitted.
-
-Lemma app_produces_vvar3 :
+Lemma app_produces_vvar :
   forall (e:Dexp) (k:Cont) (v f f':var), is_app e -> nice_continuation k ->
     rename_exp_v v (cps_exp_transform f e k) =
     rename_exp_v v (cps_exp_transform f e (fun _ _ => k f' (Ctriv_vvar v))).
-Proof.
-Admitted.
-
-Lemma start_irrevelant :
-  forall (e:Dexp) (k:Cont) (f f':var),
-    a_exp_eq (cps_exp_transform f e k) (cps_exp_transform f' e k).
-Proof.
-induction e; intros.
-unfold a_exp_eq in *; simpl.
-rewrite IHe1 with (f' := S f').
-Admitted.
-
-Lemma continuation_v_eq :
-  forall (e:Dexp) (f:var) (v v' v'':var),
-    rename_exp_v v (cps_exp_transform f e (fun _ _ => Cexp_cont (Ctriv_vvar v'))) =
-    rename_exp_v v (cps_exp_transform f e (fun _ _ => Cexp_cont (Ctriv_vvar v''))).
 Proof.
 Admitted.
 
@@ -344,9 +312,18 @@ Definition mold (rest:Cexp) (e:Dexp) : Cexp :=
   cps_exp_transform 0 e (fun _ t => rest).
 
 Lemma fold_left_is_right :
-  forall (c c':Cexp) (ds:list Dexp), a_exp_eq c c' -> a_exp_eq (fold_left mold ds c) (fold_left mold ds c').
+  forall (ds:list Dexp) (c c':Cexp), a_exp_eq c c' -> a_exp_eq (fold_left mold ds c) (fold_left mold ds c').
 Proof.
-Admitted.
+induction ds; intros; unfold a_exp_eq in *; simpl; eauto.
+rewrite IHds with (c' := (mold c' a)); auto.
+unfold mold; simpl.
+rewrite continuation_rename with (f := 0) (f' := 0) (n := 0).
+symmetry.
+rewrite continuation_rename with (f := 0) (f' := 0) (n := 0).
+rewrite H; auto.
+unfold nice_continuation; split; intros; simpl; eauto.
+unfold nice_continuation; split; intros; simpl; eauto.
+Qed.
 
 Lemma has_exactly_one_element :
   forall {A:Type} (es:list A), length es = 1 -> exists a:A, es = a :: nil.
@@ -437,27 +414,28 @@ destruct H as [d]; subst.
 exists d.
 unfold mold; simpl.
 inversion c; subst.
-specialize (app_produces_vvar d (fun _ t => Cexp_cont t) f); intros.
+unfold a_exp_eq.
+rewrite app_produces_vvar with (e := d) (v := 0) (f := f) (f' := 0).
+rewrite continuation_rename with (v :=  0) (f := 0) (f' := f) (n := 0).
+simpl; auto.
+unfold nice_continuation; split; intros; simpl; eauto.
+
 unfold is_app_list in H1.
 inversion H1; subst.
 assert (nice_continuation (fun (_:var) t => Cexp_cont t)).
 unfold nice_continuation; split; intros; simpl; eauto.
-specialize (H H2 H4).
-unfold a_exp_eq in *.
-rewrite H.
-unfold a_exp_eq; simpl.
-rewrite start_irrevelant with (f := f) (f' := 0).
-rewrite continuation_v_eq with (v'' := x); auto.
-
-
-destruct H; destruct H; subst.
+auto.
+unfold nice_continuation; split; intros; simpl; eauto.
+destruct H.
 exists x.
-unfold mold; simpl.
-symmetry in H0.
-specialize (length_zero_is_nil es H0); intros; subst; simpl; auto.
 unfold a_exp_eq; simpl.
+destruct H.
+subst.
 unfold a_triv_eq in H.
-rewrite H; auto.
+rewrite H.
+symmetry in H0.
+specialize (length_zero_is_nil es H0); intros; subst.
+simpl; auto.
 
 (* Cexp_app case *)
 intuition.
@@ -495,39 +473,42 @@ auto.
 
 unfold a_exp_eq.
 unfold mold; simpl.
-rewrite start_irrevelant with (e := x4) (f := 1) (f' := 0).
-rewrite app_produces_vvar3 with (f' := 0).
-rewrite continuation_rename with (f' := 0).
-rewrite app_produces_vvar3 with (f' := 0) (e := x3).
-rewrite continuation_rename with (e := x3) (f' := 0).
+rewrite continuation_rename with (e := x4) (f := 1) (f' := 0) (n := 0).
+rewrite app_produces_vvar with (f' := 0).
+rewrite app_produces_vvar with (f' := 0) (e := x3).
+rewrite continuation_rename_0 with (e := x3).
 symmetry.
-rewrite continuation_rename with (f' := 0).
-rewrite continuation_rename with (e := x3) (f' := 0).
+rewrite continuation_rename_0.
+rewrite continuation_rename_0 with (e := x3).
 simpl.
 auto.
-auto.
 unfold nice_continuation; split; intros; simpl; eauto.
-auto.
 unfold nice_continuation; split; intros; simpl; eauto.
-auto.
 unfold nice_continuation; split; intros; simpl; eauto.
-admit. (* is_app something thivially true. *)
+admit. (* is_app *)
 unfold nice_continuation; split; intros; simpl; eauto.
-auto.
+admit. (* is_app *)
 unfold nice_continuation; split; intros; simpl; eauto.
-admit.
-unfold nice_continuation; split; intros; simpl; eauto.
-rewrite continuation_rename with (f' := 0) (n := 0).
+rewrite continuation_rename_0.
 symmetry.
-rewrite continuation_rename with (f' := 0) (n := 0).
+rewrite continuation_rename_0.
 simpl.
 auto.
 
 unfold nice_continuation; split; intros; simpl; eauto.
 unfold nice_continuation; split; intros; simpl; eauto.
+unfold nice_continuation; split; intros; simpl; eauto.
 rewrite continuation_rename with (f' := n') (n := n').
 symmetry.
 rewrite continuation_rename with (f' := n') (n := n').
+auto.
+
+unfold nice_continuation; split; intros; simpl; eauto.
+unfold nice_continuation; split; intros; simpl; eauto.
+
+rewrite continuation_rename with (f := n) (f' := n') (n := 0).
+symmetry.
+rewrite continuation_rename with (f := n') (f' := n') (n := 0).
 auto.
 
 unfold nice_continuation; split; intros; simpl; eauto.
