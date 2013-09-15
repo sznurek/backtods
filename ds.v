@@ -435,6 +435,32 @@ trivial.
 exists a; exists a0; exists (a1::es); trivial.
 Qed.
 
+Ltac destruct_exists :=
+repeat match goal with
+| [ H : exists _, _ |- _ ] => destruct H
+end.
+
+Ltac nice_cont := unfold nice_continuation; split; intros; simpl; eauto.
+
+Ltac level_down :=
+  apply equal_arguments; try (apply equal_arguments);
+   try (apply functional_extensionality; intros); try (apply functional_extensionality; intros).
+
+Ltac cont_rename := rewrite continuation_rename_0; [ idtac | nice_cont ].
+
+Lemma start_irrevelant :
+  forall (e:Dexp) (k:Cont) (v f f':var), nice_continuation k ->
+    rename_exp_v v (cps_exp_transform f e k) = rename_exp_v v (cps_exp_transform f' e k).
+Proof.
+intros.
+rewrite continuation_rename_0.
+symmetry.
+rewrite continuation_rename_0.
+auto.
+auto.
+auto.
+Qed.
+
 Theorem cps_inverse_exists :
   forall r:Croot, CrootValid r -> exists r':Droot, a_eq (cps_transform r') r.
 Proof.
@@ -513,25 +539,18 @@ specialize (length_zero_is_nil es H0); intros; subst.
 simpl; auto.
 
 (* Cexp_app case *)
-intuition.
+intuition; destruct_exists; subst; simpl in *.
 (* v v case *)
-destruct H, H0, H5, H6; subst; simpl in *; subst.
 symmetry in H2.
-specialize (has_two_elements es (length ksi2) H2); intros.
-destruct H.
-destruct H.
-destruct H.
-subst.
+specialize (has_two_elements es (length ksi2) H2); intros; destruct_exists; subst; simpl in *.
 specialize (H1 f (Dexp_app x4 x3::x5)).
 simpl in H1.
-simpl in H2.
 inversion H2.
 rewrite H0 in H1.
 specialize (H1 eq_refl).
 
 assert (is_app_list (Dexp_app x4 x3 :: x5)).
-constructor.
-unfold is_app; simpl; auto.
+constructor; simpl; eauto.
 inversion H3; subst.
 inversion H6; subst.
 trivial.
@@ -539,57 +558,58 @@ trivial.
 specialize (H1 H).
 destruct H1 as [e'].
 exists e'.
-simpl.
-unfold a_exp_eq in H1.
-unfold a_exp_eq.
+unfold a_exp_eq in *.
 rewrite H1.
-rewrite fold_left_is_right with (c' :=(mold (mold (Cexp_app (Ctriv_vvar x2) (Ctriv_vvar x1) v e) x3) x4 )).
-auto.
+apply fold_left_is_right.
+unfold a_exp_eq; simpl.
 
-unfold a_exp_eq.
 unfold mold; simpl.
-rewrite continuation_rename_0 with (e := x4) (f := 1).
+assert (forall t0:Ctriv, nice_continuation (fun f1 t1 => Cexp_app t0 t1 f1 e)) by nice_cont.
+assert (nice_continuation (fun f0 t0 => cps_exp_transform f0 x3
+                             (fun f1 t1 => Cexp_app t0 t1 f1 e))).
+nice_cont.
+cont_rename.
+symmetry.
+cont_rename.
+level_down; simpl; auto.
+
+rewrite start_irrevelant with (f' := n'); auto.
+rewrite continuation_rename_0 with (e := x4) (f := 1); [ idtac | eauto; nice_cont ].
 rewrite app_produces_vvar with (f' := 0).
 rewrite app_produces_vvar with (f' := 0) (e := x3).
-rewrite continuation_rename_0 with (e := x3).
+rewrite continuation_rename_0 with (e := x3); [ idtac | eauto; nice_cont ].
 symmetry.
-rewrite continuation_rename_0.
-rewrite continuation_rename_0 with (e := x3).
-simpl.
-auto.
-unfold nice_continuation; split; intros; simpl; eauto.
-unfold nice_continuation; split; intros; simpl; eauto.
-unfold nice_continuation; split; intros; simpl; eauto.
-admit. (* is_app *)
-unfold nice_continuation; split; intros; simpl; eauto.
-admit. (* is_app *)
-unfold nice_continuation; split; intros; simpl; eauto.
-rewrite continuation_rename_0.
-symmetry.
-rewrite continuation_rename_0.
+rewrite continuation_rename_0 with (e := x4); [ idtac | eauto; nice_cont ].
+rewrite continuation_rename_0 with (e := x3); [ idtac | eauto; nice_cont ].
 simpl.
 auto.
 
-unfold nice_continuation; split; intros; simpl; eauto.
-unfold nice_continuation; split; intros; simpl; eauto.
-unfold nice_continuation; split; intros; simpl; eauto.
-rewrite continuation_rename with (f' := n') (n := n').
-symmetry.
-rewrite continuation_rename with (f' := n') (n := n').
+unfold is_app_list in H3.
+inversion H3.
 auto.
 
-unfold nice_continuation; split; intros; simpl; eauto.
-unfold nice_continuation; split; intros; simpl; eauto.
+nice_cont.
 
-rewrite continuation_rename with (f := n) (f' := n') (n := 0).
+unfold is_app_list in H3.
+inversion H3.
+inversion H9; auto.
+
+nice_cont.
+rewrite rename_exp_v_inv.
+rewrite rename_exp_v_inv.
+
+rewrite continuation_rename_0.
 symmetry.
-rewrite continuation_rename with (f := n') (f' := n') (n := 0).
+rewrite continuation_rename_0.
+simpl.
 auto.
 
-unfold nice_continuation; split; intros; simpl; eauto.
-unfold nice_continuation; split; intros; simpl; eauto.
+nice_cont.
+nice_cont.
 
 (* v t case *)
+
+
 
 Admitted.
 
