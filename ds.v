@@ -130,33 +130,6 @@ Definition a_exp_eq (e1:Cexp) (e2:Cexp) := rename_exp_v 0 e1 = rename_exp_v 0 e2
 Definition a_triv_eq (t1:Ctriv) (t2:Ctriv) :=
   rename_triv_v 0 t1 = rename_triv_v 0 t2.
 
-Lemma a_eq_refl :
-  forall r:Croot, a_eq r r.
-Proof.
-intros; unfold a_eq; simpl; eauto.
-Qed.
-
-Lemma a_eq_sym :
-  forall r1 r2:Croot, a_eq r1 r2 -> a_eq r2 r1.
-Proof.
-intros; unfold a_eq in *; rewrite H; eauto.
-Qed.
-
-Lemma a_eq_trans :
-  forall r1 r2 r3:Croot, a_eq r1 r2 -> a_eq r2 r3 -> a_eq r1 r3.
-Proof.
-intros; unfold a_eq in *.
-rewrite H.
-rewrite H0.
-auto.
-Qed.
-
-Add Relation Croot a_eq
-reflexivity  proved by a_eq_refl
-symmetry proved by a_eq_sym
-transitivity proved by a_eq_trans
-as a_eq_rel.
-
 Lemma length_zero_is_nil :
   forall {A:Type} (es:list A), length es = 0 -> es = nil.
 Proof.
@@ -306,7 +279,109 @@ Lemma app_produces_vvar :
     rename_exp_v v (cps_exp_transform f e k) =
     rename_exp_v v (cps_exp_transform f e (fun _ _ => k f' (Ctriv_vvar v))).
 Proof.
-Admitted.
+destruct e; simpl in *; intros; eauto.
+rewrite continuation_rename_0.
+symmetry.
+rewrite continuation_rename_0.
+apply equal_arguments.
+apply equal_arguments.
+apply functional_extensionality; intros.
+apply functional_extensionality; intros.
+
+rewrite continuation_rename_0.
+symmetry.
+rewrite continuation_rename_0.
+apply equal_arguments.
+apply equal_arguments.
+apply functional_extensionality; intros.
+apply functional_extensionality; intros.
+
+simpl.
+unfold nice_continuation in H0; destruct H0.
+rewrite H0 with (n' := f') (v1 := v); auto.
+
+unfold nice_continuation; split; intros; simpl; eauto.
+unfold nice_continuation in H0; destruct H0.
+rewrite H0 with (n' := (S n')) (v1 := n'); auto.
+
+unfold nice_continuation in H0; destruct H0.
+rewrite H0 with (n' := (S n')) (v1 := n'); auto.
+
+unfold nice_continuation; split; intros; simpl; eauto.
+unfold nice_continuation; split; intros; simpl; eauto.
+
+rewrite continuation_rename_0.
+symmetry.
+rewrite continuation_rename_0.
+apply equal_arguments.
+apply equal_arguments.
+apply functional_extensionality; intros.
+apply functional_extensionality; intros.
+simpl.
+auto.
+
+unfold nice_continuation; split; intros; simpl; eauto.
+unfold nice_continuation; split; intros; simpl; eauto.
+
+rewrite continuation_rename_0.
+symmetry.
+rewrite continuation_rename_0.
+apply equal_arguments.
+apply equal_arguments.
+apply functional_extensionality; intros.
+apply functional_extensionality; intros.
+simpl.
+auto.
+
+unfold nice_continuation; split; intros; simpl; eauto.
+unfold nice_continuation; split; intros; simpl; eauto.
+unfold nice_continuation; split; intros; simpl; eauto.
+
+rewrite continuation_rename_0.
+symmetry.
+rewrite continuation_rename_0.
+apply equal_arguments.
+apply equal_arguments.
+apply functional_extensionality; intros.
+apply functional_extensionality; intros.
+simpl.
+auto.
+
+unfold nice_continuation; split; intros; simpl; eauto.
+unfold nice_continuation in H0; destruct H0.
+rewrite H0 with (n' := (S n'0)) (v1 := n'0); auto.
+unfold nice_continuation in H0; destruct H0.
+rewrite H0 with (n' := (S n'0)) (v1 := n'0); auto.
+
+unfold nice_continuation; split; intros; simpl; eauto.
+unfold nice_continuation in H0; destruct H0.
+rewrite H0 with (n' := (S n'0)) (v1 := n'0); auto.
+unfold nice_continuation in H0; destruct H0.
+rewrite H0 with (n' := (S n'0)) (v1 := n'0); auto.
+
+rewrite continuation_rename_0.
+symmetry.
+rewrite continuation_rename_0.
+apply equal_arguments.
+apply equal_arguments.
+apply functional_extensionality; intros.
+apply functional_extensionality; intros.
+simpl.
+auto.
+
+unfold nice_continuation; split; intros; simpl; eauto.
+unfold nice_continuation in H0; destruct H0.
+rewrite H0 with (n' := (S n'0)) (v1 := n'0); auto.
+unfold nice_continuation in H0; destruct H0.
+rewrite H0 with (n' := (S n'0)) (v1 := n'0); auto.
+
+unfold nice_continuation; split; intros; simpl; eauto.
+unfold nice_continuation in H0; destruct H0.
+rewrite H0 with (n' := (S n'0)) (v1 := n'0); auto.
+unfold nice_continuation in H0; destruct H0.
+rewrite H0 with (n' := (S n'0)) (v1 := n'0); auto.
+inversion H.
+Qed.
 
 Definition mold (rest:Cexp) (e:Dexp) : Cexp :=
   cps_exp_transform 0 e (fun _ t => rest).
@@ -317,9 +392,9 @@ Proof.
 induction ds; intros; unfold a_exp_eq in *; simpl; eauto.
 rewrite IHds with (c' := (mold c' a)); auto.
 unfold mold; simpl.
-rewrite continuation_rename with (f := 0) (f' := 0) (n := 0).
+rewrite continuation_rename_0.
 symmetry.
-rewrite continuation_rename with (f := 0) (f' := 0) (n := 0).
+rewrite continuation_rename_0.
 rewrite H; auto.
 unfold nice_continuation; split; intros; simpl; eauto.
 unfold nice_continuation; split; intros; simpl; eauto.
@@ -473,7 +548,7 @@ auto.
 
 unfold a_exp_eq.
 unfold mold; simpl.
-rewrite continuation_rename with (e := x4) (f := 1) (f' := 0) (n := 0).
+rewrite continuation_rename_0 with (e := x4) (f := 1).
 rewrite app_produces_vvar with (f' := 0).
 rewrite app_produces_vvar with (f' := 0) (e := x3).
 rewrite continuation_rename_0 with (e := x3).
