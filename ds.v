@@ -176,11 +176,122 @@ end.
 Definition is_app_list (es:list Dexp) : Prop :=
   Forall is_app es.
 
-Lemma rename_under_cps :
-  forall (e:Dexp) (k:Cont) (f f' v:var),
-    rename_exp_v v (cps_exp_transform f e k) =
-    rename_exp_v v (cps_exp_transform f e (fun _ t => rename_exp_v v (k f' t))).
+Lemma rename_exp_v_inv :
+  forall (v v':var) (e:Cexp), rename_exp_v v (rename_exp_v v' e) = rename_exp_v v e.
 Proof.
+intros v v'.
+apply (Cexp_mut (fun r => rename_v v (rename_v v' r) = rename_v v r)
+                (fun t => rename_triv_v v (rename_triv_v v' t) = rename_triv_v v t)
+                (fun e => rename_exp_v v (rename_exp_v v' e) = rename_exp_v v e));
+intros; simpl; eauto.
+rewrite H; auto.
+rewrite H; auto.
+rewrite H; auto.
+rewrite H; rewrite H0; rewrite H1; auto.
+Qed.
+
+Definition nice_continuation (k:Cont) :=
+  (forall (v n n' v0 v1:var), rename_exp_v v (k n (Ctriv_vvar v0)) = rename_exp_v v (k n' (Ctriv_vvar v1))) /\
+  (forall (v n n':var) (t:Ctriv), rename_exp_v v (k n t) = rename_exp_v v (k n' t)).
+
+Lemma continuation_rename :
+  forall (e:Dexp) (k:Cont) (v n f f':var), nice_continuation k ->
+    rename_exp_v v (cps_exp_transform f e k) =
+    rename_exp_v v (cps_exp_transform f' e (fun _ t => rename_exp_v v (k n t))).
+Proof.
+induction e; intros; unfold nice_continuation in *; simpl; eauto; intuition.
+rewrite IHe1 with (n := 0) (f' := 0).
+symmetry.
+rewrite IHe1 with (n := 0) (f' := 0).
+apply equal_arguments.
+apply equal_arguments.
+apply functional_extensionality; intros.
+apply functional_extensionality; intros.
+rewrite IHe2 with (n := 0) (f' := 0).
+symmetry.
+rewrite IHe2 with (n := 0) (f' := 0).
+simpl.
+apply equal_arguments.
+apply equal_arguments.
+apply functional_extensionality; intros.
+apply functional_extensionality; intros.
+simpl.
+rewrite rename_exp_v_inv.
+rewrite H0 with (n' := n) (v1 := 0); auto.
+split; intros; simpl.
+rewrite H0 with (n' := S n') (v1 := n'); auto.
+rewrite H0 with (n' := S n') (v1 := n'); auto.
+split; intros; simpl.
+rewrite rename_exp_v_inv.
+rewrite rename_exp_v_inv.
+rewrite H0 with (n' := n) (v1 := n'); auto.
+rewrite rename_exp_v_inv.
+rewrite rename_exp_v_inv.
+rewrite H0 with (n' := n) (v1 := n'); auto.
+split; intros; simpl.
+rewrite IHe2 with (n := 0) (f' := 0).
+symmetry.
+rewrite IHe2 with (n := 0) (f' := 0).
+simpl.
+auto.
+split; intros; simpl.
+rewrite rename_exp_v_inv.
+rewrite rename_exp_v_inv.
+rewrite H0 with (n' := n) (v1 := n'0); auto.
+rewrite rename_exp_v_inv.
+rewrite rename_exp_v_inv.
+rewrite H0 with (n' := n) (v1 := n'0); auto.
+split; intros; simpl.
+rewrite rename_exp_v_inv.
+rewrite rename_exp_v_inv.
+rewrite H0 with (n' := n) (v1 := n'0); auto.
+rewrite rename_exp_v_inv.
+rewrite rename_exp_v_inv.
+rewrite H0 with (n' := n) (v1 := n'0); auto.
+rewrite IHe2 with (n := 0) (f' := 0).
+symmetry.
+rewrite IHe2 with (n := 0) (f' := 0).
+simpl; auto.
+split; intros; simpl.
+rewrite H0 with (n' := S n'0) (v1 := n'0); auto.
+rewrite rename_exp_v_inv.
+rewrite rename_exp_v_inv.
+rewrite H0 with (n' := n) (v1 := n'0); auto.
+rewrite rename_exp_v_inv.
+rewrite rename_exp_v_inv.
+rewrite H0 with (n' := n) (v1 := n'0); auto.
+split; intros; simpl.
+rewrite rename_exp_v_inv.
+rewrite rename_exp_v_inv.
+rewrite H0 with (n' := n) (v1 := n'0); auto.
+rewrite rename_exp_v_inv.
+rewrite rename_exp_v_inv.
+rewrite H0 with (n' := n) (v1 := n'0); auto.
+split; intros; simpl.
+rewrite IHe2 with (n := 0) (f' := 0).
+symmetry.
+rewrite IHe2 with (n := 0) (f' := 0).
+simpl; auto.
+split; intros; simpl.
+rewrite H0 with (n' := S n'0) (v1 := n'0); auto.
+rewrite H0 with (n' := S n'0) (v1 := n'0); auto.
+split; intros; simpl.
+rewrite H0 with (n' := S n'0) (v1 := n'0); auto.
+rewrite H0 with (n' := S n'0) (v1 := n'0); auto.
+rewrite IHe2 with (n := 0) (f' := 0).
+symmetry.
+rewrite IHe2 with (n := 0) (f' := 0).
+simpl; auto.
+split; intros; simpl.
+rewrite H0 with (n' := S n'0) (v1 := n'0); auto.
+rewrite H0 with (n' := S n'0) (v1 := n'0); auto.
+split; intros; simpl.
+rewrite H0 with (n' := S n'0) (v1 := n'0); auto.
+rewrite H0 with (n' := S n'0) (v1 := n'0); auto.
+
+rewrite rename_exp_v_inv.
+rewrite H1 with (n' := n); auto.
+Qed.
 
 Lemma app_produces_vvar :
   forall (e:Dexp) (k:Cont) (f:var),
@@ -190,20 +301,6 @@ Proof.
 induction e; intros; eauto.
 unfold a_exp_eq in *; simpl.
 rewrite IHe1.
-Admitted.
-
-Lemma app_produces_vvar2 :
-  forall (e:Dexp) (k:Cont) (f:var),
-    is_app e -> exists v:var, cps_exp_transform f e k =
-                              cps_exp_transform f e (fun n _ => k n (Ctriv_vvar v)).
-Proof.
-induction e; intros.
-case_eq e1; case_eq e2; intros; subst; eauto.
-
-specialize (IHe1 (fun n t => cps_exp_transform n (Dexp_app d d0)
-                               (fun f1 t1 => Cexp_app t t1 f1 (k (S f1) (Ctriv_vvar f1))))
-            (S f) I).
-destruct IHe1.
 Admitted.
 
 Lemma app_produces_vvar3 :
@@ -217,19 +314,15 @@ Lemma start_irrevelant :
   forall (e:Dexp) (k:Cont) (f f':var),
     a_exp_eq (cps_exp_transform f e k) (cps_exp_transform f' e k).
 Proof.
+induction e; intros.
+unfold a_exp_eq in *; simpl.
+rewrite IHe1 with (f' := S f').
 Admitted.
 
 Lemma continuation_v_eq :
   forall (e:Dexp) (f:var) (v v' v'':var),
     rename_exp_v v (cps_exp_transform f e (fun _ _ => Cexp_cont (Ctriv_vvar v'))) =
     rename_exp_v v (cps_exp_transform f e (fun _ _ => Cexp_cont (Ctriv_vvar v''))).
-Proof.
-Admitted.
-
-Lemma continuation_rename :
-  forall (e:Dexp) (k:Cont) (v f:var),
-    rename_exp_v v (cps_exp_transform f e k) =
-    rename_exp_v v (cps_exp_transform f e (fun n t => rename_exp_v v (k n t))).
 Proof.
 Admitted.
 
