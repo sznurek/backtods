@@ -16,11 +16,8 @@ with Ctriv : Set :=
 | Ctriv_vvar : var -> Ctriv
 | Ctriv_lam : var -> Croot -> Ctriv.
 
-Coercion Croot_exp : Cexp >-> Croot.
-Coercion Ctriv_var : var >-> Ctriv.
-
 Inductive CrootValid : Croot -> Prop :=
-| CrootValid_exp : forall e:Cexp, CexpValid e nil -> CrootValid e
+| CrootValid_exp : forall e:Cexp, CexpValid e nil -> CrootValid (Croot_exp e)
 with CexpValid : Cexp -> list var -> Prop :=
 | CexpValid_cont : forall (ksi:list var) (t:Ctriv), CtrivValid t ksi nil -> CexpValid (Cexp_cont t) ksi
 | CexpValid_app  : forall (ksi0 ksi1 ksi2:list var) (t0 t1:Ctriv) (v:var) (e:Cexp),
@@ -52,10 +49,6 @@ with Dtriv : Set :=
 | Dtriv_var : var -> Dtriv
 | Dtriv_lam : var -> Droot -> Dtriv.
 
-Coercion Droot_exp : Dexp >-> Droot.
-Coercion Dexp_triv : Dtriv >-> Dexp.
-Coercion Dtriv_var : var >-> Dtriv.
-
 Scheme Droot_mut := Induction for Droot Sort Type
 with Dexp_mut := Induction for Dexp Sort Type
 with Dtriv_mut := Induction for Dtriv Sort Type.
@@ -66,7 +59,7 @@ Definition Cont := var -> Ctriv -> Cexp.
 
 Fixpoint cps_transform (r:Droot) : Croot :=
 match r with
-| Droot_exp e => cps_exp_transform 0 e (fun _ t => Cexp_cont t)
+| Droot_exp e => Croot_exp (cps_exp_transform 0 e (fun _ t => Cexp_cont t))
 end
 with cps_exp_transform (f:var) (e:Dexp) (k:Cont) : Cexp :=
 match e with
@@ -77,7 +70,7 @@ match e with
 end
 with cps_triv_transform (t:Dtriv) : Ctriv :=
 match t with
-| Dtriv_var x   => x
+| Dtriv_var x   => Ctriv_var x
 | Dtriv_lam x r => Ctriv_lam x (cps_transform r)
 end.
 
@@ -279,82 +272,25 @@ Proof.
 intros; rewrite continuation_rename with (n := 0) (f' := 0); eauto.
 Qed.
 
+Ltac a_exp_eq_crusher :=
+simpl; match goal with
+| |- rename_exp_v _ (cps_exp_transform _ _ _) = rename_exp_v _ (cps_exp_transform _ _ _) =>
+  rewrite continuation_rename_0; [ symmetry;
+                                   rewrite continuation_rename_0;
+                                   [level_down | idtac ] | idtac ]; idtac
+| |- nice_continuation _ => nice_cont; idtac
+end.
+
 Lemma app_produces_vvar :
   forall (e:Dexp) (k:Cont) (v f f':var), is_app e -> nice_continuation k ->
     rename_exp_v v (cps_exp_transform f e k) =
     rename_exp_v v (cps_exp_transform f e (fun _ _ => k f' (Ctriv_vvar v))).
 Proof.
 destruct e; simpl in *; unfold nice_continuation; intros; eauto; intuition.
-rewrite continuation_rename_0.
-symmetry.
-rewrite continuation_rename_0.
-level_down.
+assert (forall v n v0:var, rename_exp_v v (k n (Ctriv_vvar v0)) =
+                            rename_exp_v v (k 0 (Ctriv_vvar 0))) as R by eauto.
 
-rewrite continuation_rename_0.
-symmetry.
-rewrite continuation_rename_0.
-level_down.
-
-simpl.
-rewrite H1 with (n' := f') (v1 := v); auto.
-
-nice_cont.
-rewrite H1 with (n' := (S n')) (v1 := n'); auto.
-rewrite H1 with (n' := (S n')) (v1 := n'); auto.
-
-nice_cont.
-nice_cont.
-
-rewrite continuation_rename_0.
-symmetry.
-rewrite continuation_rename_0.
-level_down.
-simpl.
-auto.
-
-nice_cont.
-nice_cont.
-
-rewrite continuation_rename_0.
-symmetry.
-rewrite continuation_rename_0.
-level_down.
-simpl.
-auto.
-
-nice_cont.
-nice_cont.
-nice_cont.
-
-rewrite continuation_rename_0.
-symmetry.
-rewrite continuation_rename_0.
-level_down.
-simpl.
-auto.
-
-nice_cont.
-rewrite H1 with (n' := (S n'0)) (v1 := n'0); auto.
-rewrite H1 with (n' := (S n'0)) (v1 := n'0); auto.
-
-nice_cont.
-rewrite H1 with (n' := (S n'0)) (v1 := n'0); auto.
-rewrite H1 with (n' := (S n'0)) (v1 := n'0); auto.
-
-rewrite continuation_rename_0.
-symmetry.
-rewrite continuation_rename_0.
-level_down.
-simpl.
-auto.
-
-nice_cont.
-rewrite H1 with (n' := (S n'0)) (v1 := n'0); auto.
-rewrite H1 with (n' := (S n'0)) (v1 := n'0); auto.
-
-nice_cont.
-rewrite H1 with (n' := (S n'0)) (v1 := n'0); auto.
-rewrite H1 with (n' := (S n'0)) (v1 := n'0); auto.
+repeat (simpl in *; a_exp_eq_crusher); simpl; repeat (rewrite R; symmetry; eauto).
 Qed.
 
 Definition mold (rest:Cexp) (e:Dexp) : Cexp :=
@@ -453,7 +389,7 @@ trivial.
 
 (* Ctriv_var case *)
 right.
-exists x.
+exists (Dtriv_var x).
 simpl; split; unfold a_triv_eq; simpl; auto.
 
 (* Ctriv_lam case *)
@@ -491,7 +427,7 @@ unfold nice_continuation; split; intros; simpl; eauto.
 auto.
 unfold nice_continuation; split; intros; simpl; eauto.
 destruct H.
-exists x.
+exists (Dexp_triv x).
 unfold a_exp_eq; simpl.
 destruct H.
 subst.
@@ -572,13 +508,13 @@ nice_cont.
 (* v t case *)
 destruct H0; subst.
 destruct es; [inversion H2 | idtac]; simpl in *.
-specialize (H1 f (Dexp_app x d::es)).
+specialize (H1 f (Dexp_app (Dexp_triv x) d::es)).
 inversion H2.
 simpl in H1; rewrite H4 in H1.
 specialize (H1 eq_refl).
 
 inversion H3; subst.
-assert (is_app_list (Dexp_app x d :: es)).
+assert (is_app_list (Dexp_app (Dexp_triv x) d :: es)).
 constructor; simpl; eauto.
 
 specialize (H1 H0).
@@ -608,13 +544,13 @@ nice_cont.
 (* t v case *)
 destruct H4; subst.
 destruct es; [inversion H2 | idtac]; simpl in *.
-specialize (H1 f (Dexp_app d x1 ::es)).
+specialize (H1 f (Dexp_app d (Dexp_triv x1) ::es)).
 inversion H2.
 simpl in H1; rewrite H4 in H1.
 specialize (H1 eq_refl).
 
 inversion H3; subst.
-assert (is_app_list (Dexp_app d x1 :: es)).
+assert (is_app_list (Dexp_app d (Dexp_triv x1) :: es)).
 constructor; simpl; eauto.
 
 specialize (H1 H0).
@@ -645,9 +581,9 @@ nice_cont.
 
 destruct H0; destruct H; subst.
 rewrite <- H2 in H1.
-specialize (H1 f (Dexp_app x x0 :: es) eq_refl).
+specialize (H1 f (Dexp_app (Dexp_triv x) (Dexp_triv x0) :: es) eq_refl).
 
-assert (is_app_list (Dexp_app x x0 :: es)).
+assert (is_app_list (Dexp_app (Dexp_triv x) (Dexp_triv x0) :: es)).
 constructor; simpl; eauto.
 
 specialize (H1 H4).
