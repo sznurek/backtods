@@ -171,105 +171,29 @@ Ltac level_down :=
   apply equal_arguments; try (apply equal_arguments);
    try (apply functional_extensionality; intros); try (apply functional_extensionality; intros).
 
-Lemma continuation_rename :
-  forall (e:Dexp) (k:Cont) (v n f f':var), nice_continuation k ->
-    rename_exp_v v (cps_exp_transform f e k) =
-    rename_exp_v v (cps_exp_transform f' e (fun _ t => rename_exp_v v (k n t))).
-Proof.
-Hint Rewrite rename_exp_v_inv : rename.
-induction e; intros; unfold nice_continuation in *; simpl; eauto; intuition; autorewrite with rename.
-rewrite IHe1 with (n := 0) (f' := 0); autorewrite with rename.
-symmetry.
-rewrite IHe1 with (n := 0) (f' := 0); autorewrite with rename.
-level_down.
-rewrite IHe2 with (n := 0) (f' := 0); autorewrite with rename.
-symmetry.
-rewrite IHe2 with (n := 0) (f' := 0); autorewrite with rename.
-simpl.
-level_down.
-
-autorewrite with rename.
-rewrite H0 with (n' := n) (v1 := 0); auto.
-split; intros; simpl.
-rewrite H0 with (n' := S n') (v1 := n'); auto.
-rewrite H0 with (n' := S n') (v1 := n'); auto.
-split; intros; simpl.
-rewrite rename_exp_v_inv.
-rewrite rename_exp_v_inv.
-rewrite H0 with (n' := n) (v1 := n'); auto.
-rewrite rename_exp_v_inv.
-rewrite rename_exp_v_inv.
-rewrite H0 with (n' := n) (v1 := n'); auto.
-split; intros; simpl.
-rewrite IHe2 with (n := 0) (f' := 0).
-symmetry.
-rewrite IHe2 with (n := 0) (f' := 0).
-simpl.
-auto.
-split; intros; simpl.
-rewrite rename_exp_v_inv.
-rewrite rename_exp_v_inv.
-rewrite H0 with (n' := n) (v1 := n'0); auto.
-rewrite rename_exp_v_inv.
-rewrite rename_exp_v_inv.
-rewrite H0 with (n' := n) (v1 := n'0); auto.
-split; intros; simpl.
-rewrite rename_exp_v_inv.
-rewrite rename_exp_v_inv.
-rewrite H0 with (n' := n) (v1 := n'0); auto.
-rewrite rename_exp_v_inv.
-rewrite rename_exp_v_inv.
-rewrite H0 with (n' := n) (v1 := n'0); auto.
-rewrite IHe2 with (n := 0) (f' := 0).
-symmetry.
-rewrite IHe2 with (n := 0) (f' := 0).
-simpl; auto.
-split; intros; simpl.
-rewrite H0 with (n' := S n'0) (v1 := n'0); auto.
-rewrite rename_exp_v_inv.
-rewrite rename_exp_v_inv.
-rewrite H0 with (n' := n) (v1 := n'0); auto.
-rewrite rename_exp_v_inv.
-rewrite rename_exp_v_inv.
-rewrite H0 with (n' := n) (v1 := n'0); auto.
-split; intros; simpl.
-rewrite rename_exp_v_inv.
-rewrite rename_exp_v_inv.
-rewrite H0 with (n' := n) (v1 := n'0); auto.
-rewrite rename_exp_v_inv.
-rewrite rename_exp_v_inv.
-rewrite H0 with (n' := n) (v1 := n'0); auto.
-split; intros; simpl.
-rewrite IHe2 with (n := 0) (f' := 0).
-symmetry.
-rewrite IHe2 with (n := 0) (f' := 0).
-simpl; auto.
-split; intros; simpl.
-rewrite H0 with (n' := S n'0) (v1 := n'0); auto.
-rewrite H0 with (n' := S n'0) (v1 := n'0); auto.
-split; intros; simpl.
-rewrite H0 with (n' := S n'0) (v1 := n'0); auto.
-rewrite H0 with (n' := S n'0) (v1 := n'0); auto.
-rewrite IHe2 with (n := 0) (f' := 0).
-symmetry.
-rewrite IHe2 with (n := 0) (f' := 0).
-simpl; auto.
-split; intros; simpl.
-rewrite H0 with (n' := S n'0) (v1 := n'0); auto.
-rewrite H0 with (n' := S n'0) (v1 := n'0); auto.
-split; intros; simpl.
-rewrite H0 with (n' := S n'0) (v1 := n'0); auto.
-rewrite H0 with (n' := S n'0) (v1 := n'0); auto.
-
-rewrite H1 with (n' := n); auto.
-Qed.
-
 Lemma continuation_rename_0 :
-  forall (e:Dexp) (k:Cont) (v f:var), nice_continuation k ->
+  forall (e:Dexp) (k:Cont) (f v:var), nice_continuation k ->
     rename_exp_v v (cps_exp_transform f e k) =
     rename_exp_v v (cps_exp_transform 0 e (fun _ t => rename_exp_v v (k 0 t))).
 Proof.
-intros; rewrite continuation_rename with (n := 0) (f' := 0); eauto.
+induction e; intros; unfold nice_continuation in H; simpl; intuition;
+[rewrite IHe1; [symmetry; rewrite IHe1; [
+      level_down
+    | idtac]
+  | idtac];
+
+  repeat (simpl in *; match goal with
+  | |- context[rename_exp_v _ (cps_exp_transform _ _ (fun f _ => Cexp_app _ _ f _)) =
+               rename_exp_v _ (cps_exp_transform _ _ (fun g _ => Cexp_app _ _ g _))] =>
+    (rewrite IHe2; [ symmetry; rewrite IHe2; [simpl; level_down | idtac] | idtac ])
+  | |- context[rename_exp_v _ (rename_exp_v _ _)] => rewrite rename_exp_v_inv
+  | |- nice_continuation _ => nice_cont
+  | |- context [rename_exp_v _ (_ ?N (Ctriv_vvar ?V0))] => rewrite H0 with (n := N) (v0 := V0) (n' := 0) (v1 := 0)
+  end; simpl in *; eauto)
+| idtac ].
+
+rewrite rename_exp_v_inv.
+symmetry; rewrite H1 with (n' := f); auto.
 Qed.
 
 Ltac a_exp_eq_crusher :=
@@ -416,9 +340,11 @@ unfold mold; simpl.
 inversion c; subst.
 unfold a_exp_eq.
 rewrite app_produces_vvar with (e := d) (v := 0) (f := f) (f' := 0).
-rewrite continuation_rename with (v :=  0) (f := 0) (f' := f) (n := 0).
+rewrite continuation_rename_0 with (v := 0) (f := 0).
+rewrite continuation_rename_0 with (v := 0) (f := f).
 simpl; auto.
-unfold nice_continuation; split; intros; simpl; eauto.
+nice_cont.
+nice_cont.
 
 unfold is_app_list in H1.
 inversion H1; subst.
