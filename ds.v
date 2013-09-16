@@ -284,7 +284,7 @@ Lemma app_produces_vvar :
     rename_exp_v v (cps_exp_transform f e k) =
     rename_exp_v v (cps_exp_transform f e (fun _ _ => k f' (Ctriv_vvar v))).
 Proof.
-destruct e; simpl in *; intros; eauto.
+destruct e; simpl in *; unfold nice_continuation; intros; eauto; intuition.
 rewrite continuation_rename_0.
 symmetry.
 rewrite continuation_rename_0.
@@ -296,15 +296,11 @@ rewrite continuation_rename_0.
 level_down.
 
 simpl.
-unfold nice_continuation in H0; destruct H0.
-rewrite H0 with (n' := f') (v1 := v); auto.
+rewrite H1 with (n' := f') (v1 := v); auto.
 
 nice_cont.
-unfold nice_continuation in H0; destruct H0.
-rewrite H0 with (n' := (S n')) (v1 := n'); auto.
-
-unfold nice_continuation in H0; destruct H0.
-rewrite H0 with (n' := (S n')) (v1 := n'); auto.
+rewrite H1 with (n' := (S n')) (v1 := n'); auto.
+rewrite H1 with (n' := (S n')) (v1 := n'); auto.
 
 nice_cont.
 nice_cont.
@@ -338,16 +334,12 @@ simpl.
 auto.
 
 nice_cont.
-unfold nice_continuation in H0; destruct H0.
-rewrite H0 with (n' := (S n'0)) (v1 := n'0); auto.
-unfold nice_continuation in H0; destruct H0.
-rewrite H0 with (n' := (S n'0)) (v1 := n'0); auto.
+rewrite H1 with (n' := (S n'0)) (v1 := n'0); auto.
+rewrite H1 with (n' := (S n'0)) (v1 := n'0); auto.
 
 nice_cont.
-unfold nice_continuation in H0; destruct H0.
-rewrite H0 with (n' := (S n'0)) (v1 := n'0); auto.
-unfold nice_continuation in H0; destruct H0.
-rewrite H0 with (n' := (S n'0)) (v1 := n'0); auto.
+rewrite H1 with (n' := (S n'0)) (v1 := n'0); auto.
+rewrite H1 with (n' := (S n'0)) (v1 := n'0); auto.
 
 rewrite continuation_rename_0.
 symmetry.
@@ -357,17 +349,12 @@ simpl.
 auto.
 
 nice_cont.
-unfold nice_continuation in H0; destruct H0.
-rewrite H0 with (n' := (S n'0)) (v1 := n'0); auto.
-unfold nice_continuation in H0; destruct H0.
-rewrite H0 with (n' := (S n'0)) (v1 := n'0); auto.
+rewrite H1 with (n' := (S n'0)) (v1 := n'0); auto.
+rewrite H1 with (n' := (S n'0)) (v1 := n'0); auto.
 
 nice_cont.
-unfold nice_continuation in H0; destruct H0.
-rewrite H0 with (n' := (S n'0)) (v1 := n'0); auto.
-unfold nice_continuation in H0; destruct H0.
-rewrite H0 with (n' := (S n'0)) (v1 := n'0); auto.
-inversion H.
+rewrite H1 with (n' := (S n'0)) (v1 := n'0); auto.
+rewrite H1 with (n' := (S n'0)) (v1 := n'0); auto.
 Qed.
 
 Definition mold (rest:Cexp) (e:Dexp) : Cexp :=
