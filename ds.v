@@ -288,77 +288,62 @@ destruct e; simpl in *; intros; eauto.
 rewrite continuation_rename_0.
 symmetry.
 rewrite continuation_rename_0.
-apply equal_arguments.
-apply equal_arguments.
-apply functional_extensionality; intros.
-apply functional_extensionality; intros.
+level_down.
 
 rewrite continuation_rename_0.
 symmetry.
 rewrite continuation_rename_0.
-apply equal_arguments.
-apply equal_arguments.
-apply functional_extensionality; intros.
-apply functional_extensionality; intros.
+level_down.
 
 simpl.
 unfold nice_continuation in H0; destruct H0.
 rewrite H0 with (n' := f') (v1 := v); auto.
 
-unfold nice_continuation; split; intros; simpl; eauto.
+nice_cont.
 unfold nice_continuation in H0; destruct H0.
 rewrite H0 with (n' := (S n')) (v1 := n'); auto.
 
 unfold nice_continuation in H0; destruct H0.
 rewrite H0 with (n' := (S n')) (v1 := n'); auto.
 
-unfold nice_continuation; split; intros; simpl; eauto.
-unfold nice_continuation; split; intros; simpl; eauto.
+nice_cont.
+nice_cont.
 
 rewrite continuation_rename_0.
 symmetry.
 rewrite continuation_rename_0.
-apply equal_arguments.
-apply equal_arguments.
-apply functional_extensionality; intros.
-apply functional_extensionality; intros.
+level_down.
 simpl.
 auto.
 
-unfold nice_continuation; split; intros; simpl; eauto.
-unfold nice_continuation; split; intros; simpl; eauto.
+nice_cont.
+nice_cont.
 
 rewrite continuation_rename_0.
 symmetry.
 rewrite continuation_rename_0.
-apply equal_arguments.
-apply equal_arguments.
-apply functional_extensionality; intros.
-apply functional_extensionality; intros.
+level_down.
 simpl.
 auto.
 
-unfold nice_continuation; split; intros; simpl; eauto.
-unfold nice_continuation; split; intros; simpl; eauto.
-unfold nice_continuation; split; intros; simpl; eauto.
+nice_cont.
+nice_cont.
+nice_cont.
 
 rewrite continuation_rename_0.
 symmetry.
 rewrite continuation_rename_0.
-apply equal_arguments.
-apply equal_arguments.
-apply functional_extensionality; intros.
-apply functional_extensionality; intros.
+level_down.
 simpl.
 auto.
 
-unfold nice_continuation; split; intros; simpl; eauto.
+nice_cont.
 unfold nice_continuation in H0; destruct H0.
 rewrite H0 with (n' := (S n'0)) (v1 := n'0); auto.
 unfold nice_continuation in H0; destruct H0.
 rewrite H0 with (n' := (S n'0)) (v1 := n'0); auto.
 
-unfold nice_continuation; split; intros; simpl; eauto.
+nice_cont.
 unfold nice_continuation in H0; destruct H0.
 rewrite H0 with (n' := (S n'0)) (v1 := n'0); auto.
 unfold nice_continuation in H0; destruct H0.
@@ -367,20 +352,17 @@ rewrite H0 with (n' := (S n'0)) (v1 := n'0); auto.
 rewrite continuation_rename_0.
 symmetry.
 rewrite continuation_rename_0.
-apply equal_arguments.
-apply equal_arguments.
-apply functional_extensionality; intros.
-apply functional_extensionality; intros.
+level_down.
 simpl.
 auto.
 
-unfold nice_continuation; split; intros; simpl; eauto.
+nice_cont.
 unfold nice_continuation in H0; destruct H0.
 rewrite H0 with (n' := (S n'0)) (v1 := n'0); auto.
 unfold nice_continuation in H0; destruct H0.
 rewrite H0 with (n' := (S n'0)) (v1 := n'0); auto.
 
-unfold nice_continuation; split; intros; simpl; eauto.
+nice_cont.
 unfold nice_continuation in H0; destruct H0.
 rewrite H0 with (n' := (S n'0)) (v1 := n'0); auto.
 unfold nice_continuation in H0; destruct H0.
