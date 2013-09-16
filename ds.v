@@ -226,12 +226,7 @@ Proof.
 induction ds; intros; unfold a_exp_eq in *; simpl; eauto.
 rewrite IHds with (c' := (mold c' a)); auto.
 unfold mold; simpl.
-rewrite continuation_rename_0.
-symmetry.
-rewrite continuation_rename_0.
-rewrite H; auto.
-unfold nice_continuation; split; intros; simpl; eauto.
-unfold nice_continuation; split; intros; simpl; eauto.
+rewrite continuation_rename_0; [ symmetry; rewrite continuation_rename_0; [ rewrite H; auto | nice_cont] | nice_cont ].
 Qed.
 
 Lemma has_exactly_one_element :
@@ -274,12 +269,8 @@ Lemma start_irrevelant :
     rename_exp_v v (cps_exp_transform f e k) = rename_exp_v v (cps_exp_transform f' e k).
 Proof.
 intros.
-rewrite continuation_rename_0.
-symmetry.
-rewrite continuation_rename_0.
-auto.
-auto.
-auto.
+rewrite continuation_rename_0 with (f := f); auto.
+rewrite continuation_rename_0 with (f := f'); auto.
 Qed.
 
 Ltac cont_rename := rewrite continuation_rename_0; [ idtac | nice_cont ].
@@ -349,9 +340,9 @@ nice_cont.
 unfold is_app_list in H1.
 inversion H1; subst.
 assert (nice_continuation (fun (_:var) t => Cexp_cont t)).
-unfold nice_continuation; split; intros; simpl; eauto.
+nice_cont.
 auto.
-unfold nice_continuation; split; intros; simpl; eauto.
+nice_cont.
 destruct H.
 exists (Dexp_triv x).
 unfold a_exp_eq; simpl.
