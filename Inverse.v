@@ -4,75 +4,9 @@ Require Import ZArith.
 Require Import FunctionalExtensionality.
 Require Import Setoid.
 
-Definition var := nat.
-
-Inductive Croot : Set :=
-| Croot_exp : Cexp -> Croot
-with Cexp : Set :=
-| Cexp_cont : Ctriv -> Cexp
-| Cexp_app  : Ctriv -> Ctriv -> var -> Cexp -> Cexp
-with Ctriv : Set :=
-| Ctriv_var : var -> Ctriv
-| Ctriv_vvar : var -> Ctriv
-| Ctriv_lam : var -> Croot -> Ctriv.
-
-Inductive CrootValid : Croot -> Prop :=
-| CrootValid_exp : forall e:Cexp, CexpValid e nil -> CrootValid (Croot_exp e)
-with CexpValid : Cexp -> list var -> Prop :=
-| CexpValid_cont : forall (ksi:list var) (t:Ctriv), CtrivValid t ksi nil -> CexpValid (Cexp_cont t) ksi
-| CexpValid_app  : forall (ksi0 ksi1 ksi2:list var) (t0 t1:Ctriv) (v:var) (e:Cexp),
-                     CtrivValid t1 ksi0 ksi1 -> CtrivValid t0 ksi1 ksi2 ->
-                     CexpValid e (v::ksi2) ->
-                     CexpValid (Cexp_app t0 t1 v e) ksi0
-with CtrivValid : Ctriv -> list var -> list var -> Prop :=
-| CtrivValid_vvar : forall (ksi:list var) (v:var), CtrivValid (Ctriv_vvar v) (v::ksi) ksi
-| CtrivValid_var  : forall (ksi:list var) (x:var), CtrivValid (Ctriv_var x) ksi ksi
-| CtrivValid_lam  : forall (ksi:list var) (x:var) (r:Croot), CrootValid r -> CtrivValid (Ctriv_lam x r) ksi ksi.
-
-Scheme Croot_mut := Induction for Croot Sort Type
-with Ctriv_mut := Induction for Ctriv Sort Type
-with Cexp_mut := Induction for Cexp Sort Type.
-
-Scheme CrootValid_mut := Induction for CrootValid Sort Prop
-with CtrivValid_mut := Induction for CtrivValid Sort Prop
-with CexpValid_mut := Induction for CexpValid Sort Prop.
-
-Hint Constructors Ctriv Cexp Croot.
-Hint Constructors CtrivValid CexpValid CrootValid.
-
-Inductive Droot : Set :=
-| Droot_exp : Dexp -> Droot
-with Dexp : Set :=
-| Dexp_app  : Dexp -> Dexp -> Dexp
-| Dexp_triv : Dtriv -> Dexp
-with Dtriv : Set :=
-| Dtriv_var : var -> Dtriv
-| Dtriv_lam : var -> Droot -> Dtriv.
-
-Scheme Droot_mut := Induction for Droot Sort Type
-with Dexp_mut := Induction for Dexp Sort Type
-with Dtriv_mut := Induction for Dtriv Sort Type.
-
-Hint Constructors Droot Dexp Dtriv.
-
-Definition Cont := var -> Ctriv -> Cexp.
-
-Fixpoint cps_transform (r:Droot) : Croot :=
-match r with
-| Droot_exp e => Croot_exp (cps_exp_transform 0 e (fun _ t => Cexp_cont t))
-end
-with cps_exp_transform (f:var) (e:Dexp) (k:Cont) : Cexp :=
-match e with
-| Dexp_app e0 e1 => cps_exp_transform (S f) e0 (fun f0 t0 =>
-                    cps_exp_transform f0 e1 (fun f1 t1 =>
-                        Cexp_app t0 t1 f1 (k (S f1) (Ctriv_vvar f1))))
-| Dexp_triv t    => k f (cps_triv_transform t)
-end
-with cps_triv_transform (t:Dtriv) : Ctriv :=
-match t with
-| Dtriv_var x   => Ctriv_var x
-| Dtriv_lam x r => Ctriv_lam x (cps_transform r)
-end.
+Require Import Terms.
+Require Import Equivalence.
+Require Import Transformations.
 
 Definition good_continuation (k:Cont) (s:list var) :=
   forall (f:var) (t:Ctriv) (s':list var),
@@ -100,29 +34,6 @@ intros; eauto.
 rewrite H; auto.
 Qed.
 
-Fixpoint rename_v (v:var) (r:Croot) : Croot :=
-match r with
-| Croot_exp e => Croot_exp (rename_exp_v v e)
-end
-with rename_exp_v (v:var) (e:Cexp) : Cexp :=
-match e with
-| Cexp_cont t          => Cexp_cont (rename_triv_v v t)
-| Cexp_app t0 t1 v' e' => let t0' := rename_triv_v v t0 in
-                          let t1' := rename_triv_v v t1 in
-                          Cexp_app t0' t1' v (rename_exp_v v e')
-end
-with rename_triv_v (v:var) (t:Ctriv) : Ctriv :=
-match t with
-| Ctriv_var x   => Ctriv_var x
-| Ctriv_lam x r => Ctriv_lam x (rename_v v r)
-| Ctriv_vvar _  => Ctriv_vvar v
-end.
-
-Definition a_eq (r1:Croot) (r2:Croot) := rename_v 0 r1 = rename_v 0 r2.
-Definition a_exp_eq (e1:Cexp) (e2:Cexp) := rename_exp_v 0 e1 = rename_exp_v 0 e2.
-Definition a_triv_eq (t1:Ctriv) (t2:Ctriv) :=
-  rename_triv_v 0 t1 = rename_triv_v 0 t2.
-
 Lemma length_zero_is_nil :
   forall {A:Type} (es:list A), length es = 0 -> es = nil.
 Proof.
@@ -142,19 +53,6 @@ end.
 Definition is_app_list (es:list Dexp) : Prop :=
   Forall is_app es.
 
-Lemma rename_exp_v_inv :
-  forall (v v':var) (e:Cexp), rename_exp_v v (rename_exp_v v' e) = rename_exp_v v e.
-Proof.
-intros v v'.
-apply (Cexp_mut (fun r => rename_v v (rename_v v' r) = rename_v v r)
-                (fun t => rename_triv_v v (rename_triv_v v' t) = rename_triv_v v t)
-                (fun e => rename_exp_v v (rename_exp_v v' e) = rename_exp_v v e));
-intros; simpl; eauto.
-rewrite H; auto.
-rewrite H; auto.
-rewrite H; auto.
-rewrite H; rewrite H0; rewrite H1; auto.
-Qed.
 
 Definition nice_continuation (k:Cont) :=
   (forall (v n n' v0 v1:var), rename_exp_v v (k n (Ctriv_vvar v0)) = rename_exp_v v (k n' (Ctriv_vvar v1))) /\
