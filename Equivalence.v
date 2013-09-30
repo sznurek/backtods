@@ -26,13 +26,12 @@ Definition a_triv_eq (t1:Ctriv) (t2:Ctriv) :=
 Lemma rename_exp_v_inv :
   forall (v v':var) (e:Cexp), rename_exp_v v (rename_exp_v v' e) = rename_exp_v v e.
 Proof.
-intros v v'.
+intros v v';
 apply (Cexp_mut (fun r => rename_v v (rename_v v' r) = rename_v v r)
                 (fun t => rename_triv_v v (rename_triv_v v' t) = rename_triv_v v t)
                 (fun e => rename_exp_v v (rename_exp_v v' e) = rename_exp_v v e));
-intros; simpl; eauto.
-rewrite H; auto.
-rewrite H; auto.
-rewrite H; auto.
-rewrite H; rewrite H0; rewrite H1; auto.
+intros; simpl; eauto;
+repeat match goal with
+| [ H : _ = _ |- _ ] => rewrite H; eauto
+end.
 Qed.
